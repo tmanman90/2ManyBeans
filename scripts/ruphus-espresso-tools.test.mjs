@@ -9,6 +9,7 @@ import { resolveRuphusActionRequest } from '../src/lib/ruphusActionIdentity.js';
 import { retainActionReceipt } from '../src/lib/ruphus/session.js';
 import { espressoReceiptsForSession, firestoreReaders } from '../api/ruphus-agent.js';
 import { buildDynamicEvidenceBlock } from '../api/_lib/ruphusPrompt.js';
+import { buildRuphusContext } from '../api/_lib/ruphusContext.js';
 
 const setup = {
   espressoMachine: 'breville-barista-express',
@@ -713,4 +714,42 @@ const partialGeneric = buildEspressoRecipe({ bean: { id: 'bean-1' }, setup: { es
 assert.equal(partialGeneric.recipe.doseGrams, null);
 assert.match(partialGeneric.recipe.setupDescription, /Barista Express/);
 assert.doesNotMatch(partialGeneric.recipe.grindGuidance, /Barista Express grinder default/);
+// Sealed shelf refs reach the tools. A save named with a sealed bag's ref
+// must land on that exact bag, and a rotation ref must still land on the jar.
+{
+  const sealedDb = makeFirestore();
+  const beanRef = (id) => sealedDb.collection('users').doc('owner-1').collection('beans').doc(id);
+  sealedDb.seed(sealedDb.collection('users').doc('owner-1'), { preferences: setup });
+  const inventory = [
+    { id: 'jar-bean', ownerId: 'owner-1', name: 'El Vergel', origin: 'Colombia', process: 'Washed', jarSlot: 1, status: 'ACTIVE' },
+    { id: 'sealed-bean', ownerId: 'owner-1', name: 'Kafiex Colombia', roaster: 'Kafiex', origin: 'Colombia', process: 'Natural', status: 'SEALED', roastDate: '2026-11-13', degasMin: 3, peakStart: 10, peakEnd: 30 },
+    { id: 'sealed-other', ownerId: 'owner-1', name: 'Fritz Ethiopia', roaster: 'Fritz', origin: 'Ethiopia', process: 'Washed', status: 'SEALED', roastDate: '2026-11-20', degasMin: 3, peakStart: 10, peakEnd: 30 },
+  ];
+  for (const bean of inventory) sealedDb.seed(beanRef(bean.id), bean);
+  const readers = {
+    listCoffees: async () => inventory.map((bean) => ({ ...bean, ...(sealedDb.read(beanRef(bean.id)) || {}) })),
+    readSetup: async () => setup,
+    readCoffee: async ({ coffeeId }) => sealedDb.read(beanRef(coffeeId)),
+    readRecipe: async ({ coffeeId }) => (sealedDb.read(beanRef(coffeeId)) || {}).espressoRecipe || { code: 'recipe_missing', slotKey: 'espresso' },
+  };
+  const saveFor = async (userText, pickRef, sessionId, doseGrams) => {
+    const context = await buildRuphusContext({ uid: 'owner-1', contextRef: { surface: 'direct' }, userText, evidenceByteCap: 10000, readers });
+    context.sessionId = sessionId;
+    const coffeeRef = pickRef(context);
+    assert.ok(coffeeRef, 'expected a ref for the target bag');
+    const tools = createRuphusTools({ uid: 'owner-1', context, readers, db: sealedDb });
+    return { coffeeRef, result: await tools.call('save_espresso_recipe', { coffeeRef, slot: 'espresso', doseGrams, yieldGrams: doseGrams * 2, grinderValue: null, temperatureOffsetF: null }) };
+  };
+  const sealedSave = await saveFor('Please save 18 grams for the Kafiex Colombia espresso recipe.', (context) => context.rotationSnapshot.sealedShelf.find((bag) => bag.name === 'Kafiex Colombia')?.refKey, 'turn-sealed-save', 18);
+  assert.equal(sealedSave.result.ok, true, JSON.stringify(sealedSave.result));
+  assert.equal(sealedDb.read(beanRef('sealed-bean')).espressoRecipe.doseGrams, 18);
+  assert.equal(sealedDb.read(beanRef('sealed-other')).espressoRecipe, undefined);
+  assert.equal(sealedDb.read(beanRef('jar-bean')).espressoRecipe, undefined);
+  const jarSave = await saveFor('Please save 19 grams for the El Vergel espresso recipe.', (context) => context.rotationSnapshot.coffees.find((coffee) => coffee.name === 'El Vergel')?.refKey, 'turn-jar-save', 19);
+  assert.equal(jarSave.result.ok, true, JSON.stringify(jarSave.result));
+  assert.equal(sealedDb.read(beanRef('jar-bean')).espressoRecipe.doseGrams, 19);
+  assert.equal(sealedDb.read(beanRef('sealed-bean')).espressoRecipe.doseGrams, 18);
+  assert.equal(sealedDb.read(beanRef('sealed-other')).espressoRecipe, undefined);
+  assert.notEqual(sealedSave.coffeeRef, jarSave.coffeeRef);
+}
 console.log('ruphus espresso tools tests: existing save/idempotency/Undo plus generic equipment contracts passed');

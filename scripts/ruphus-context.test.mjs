@@ -153,3 +153,37 @@ test('context exposes only the exact editable review as typed current recipe con
   assert.match(block, /read_recipe.*propose_recipe_change/);
   assert.match(block, /serving-dose-only follow-up/);
 });
+
+test('context and provider block carry the sealed shelf as unopened bags without raw IDs', async () => {
+  const day = (days) => { const date = new Date(Date.now() - days * 86400000); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
+  const coffees = [
+    { id: 'firestore-jar-1', name: 'El Vergel', origin: 'Colombia', process: 'Washed', jarSlot: 1, status: 'ACTIVE' },
+    { id: 'firestore-sealed-1', name: 'Kafiex Colombia', roaster: 'Kafiex', origin: 'Colombia', process: 'Natural', status: 'SEALED', roastDate: day(12), degasMin: 3, peakStart: 10, peakEnd: 30 },
+    { id: 'firestore-sealed-2', name: 'Fritz Ethiopia', roaster: 'Fritz', origin: 'Ethiopia', process: 'Washed', status: 'SEALED', roastDate: day(5), degasMin: 3, peakStart: 10, peakEnd: 30 },
+    { id: 'firestore-finished', name: 'Finished Panama', status: 'FINISHED' },
+  ];
+  const context = await buildRuphusContext({ uid: 'u1', contextRef: { surface: 'direct' }, userText: 'What bean should I open next?', evidenceByteCap: 10000, readers: { listCoffees: async () => coffees } });
+  const shelf = context.rotationSnapshot.sealedShelf;
+  assert.deepEqual(shelf.map((bag) => bag.name), ['Kafiex Colombia', 'Fritz Ethiopia']);
+  assert.ok(shelf.every((bag) => bag.opened === false));
+  assert.equal(context.__ruphusRefs[shelf[0].refKey], 'firestore-sealed-1');
+  assert.match(context.rotationSnapshot.text, /El Vergel/);
+  assert.doesNotMatch(context.rotationSnapshot.text, /Kafiex/);
+  const block = buildDynamicEvidenceBlock(context);
+  assert.match(block, /Sealed shelf \(not opened yet/);
+  assert.match(block, /Kafiex Colombia/);
+  assert.doesNotMatch(block, /firestore-|Finished Panama/);
+  assert.doesNotMatch(JSON.stringify(context), /firestore-sealed|firestore-finished/);
+});
+
+test('naming a sealed bag binds to its sealed shelf ref', async () => {
+  const coffees = [
+    { id: 'jar-1', name: 'El Vergel', origin: 'Colombia', jarSlot: 1, status: 'ACTIVE' },
+    { id: 'sealed-1', name: 'Kafiex Colombia', roaster: 'Kafiex', origin: 'Colombia', status: 'SEALED', roastDate: '2026-11-13', degasMin: 3, peakStart: 10, peakEnd: 30 },
+  ];
+  const context = await buildRuphusContext({ uid: 'u1', contextRef: { surface: 'direct' }, userText: 'Tell me about the Kafiex Colombia.', evidenceByteCap: 10000, readers: { listCoffees: async () => coffees } });
+  const sealedRef = context.rotationSnapshot.sealedShelf[0].refKey;
+  assert.equal(context.turnBinding?.status, 'locked');
+  assert.equal(context.turnBinding.coffeeRef, sealedRef);
+  assert.equal(context.__ruphusRefs[sealedRef], 'sealed-1');
+});

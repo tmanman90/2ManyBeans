@@ -1,12 +1,18 @@
 import { projectBrewEvidence } from './ruphusBrewEvidence.js';
 import { canonicalHash, clone } from '../../src/lib/ruphus/contracts.js';
 import { formatBrewContext, isMilkDrink, snapshotBrewContext } from '../../src/lib/brewContext.js';
+import { daysSinceRoast, effectivePeakEnd, getPeakStatus } from '../../src/lib/peakStatus.js';
+import { getRecommendations } from '../../src/lib/recommendations.js';
 
 export const DEFAULT_HISTORY_DAYS = 14;
 export const MAX_SNAPSHOT_LINES = 12;
 // E1/E3 concrete bounds from the approved requirements: twelve snapshot
 // lines/about 600 characters and eight ledger entries/about 4 KB.
 export const MAX_SNAPSHOT_CHARS = 600;
+// The sealed shelf has its own budget so unopened bags never squeeze out the
+// rotation lines above.
+export const MAX_SEALED_SHELF_BAGS = 8;
+export const MAX_SEALED_SHELF_CHARS = 1000;
 export const MAX_LEDGER_ENTRIES = 8;
 export const MAX_LEDGER_BYTES = 4096;
 export const MAX_READS_PER_TURN = 6;
@@ -179,6 +185,75 @@ function safeCoffee(coffee, refKey) {
   };
 }
 
+const clip = (value, max = 48) => { const value_ = text(value); return value_.length <= max ? value_ : `${value_.slice(0, max - 1).trimEnd()}…`; };
+const finite = (value) => typeof value === 'number' && Number.isFinite(value);
+
+// Peak state comes from the app's own getPeakStatus label, so the agent and
+// the Inventory tab never disagree about where a bag is in its window.
+function sealedPeak(coffee) {
+  if (!text(coffee?.roastDate)) return { state: 'unknown', label: 'roast date unknown' };
+  const peakStart = coffee?.peakStart;
+  const peakEnd = effectivePeakEnd(coffee || {});
+  if (!finite(peakStart) || !finite(peakEnd)) return { state: 'unknown', label: 'peak window unknown' };
+  const status = getPeakStatus(coffee);
+  const days = daysSinceRoast(coffee.roastDate, coffee);
+  if (status.frozen) return { state: 'frozen', label: 'frozen' };
+  if (!finite(days)) return { state: 'unknown', label: 'peak window unknown' };
+  if (/^(?:Degassing|Resting)/.test(status.label)) return { state: 'before', daysUntilPeak: peakStart - days, label: `${status.label.toLowerCase()}, peak in ${peakStart - days} days` };
+  if (/^In Peak/.test(status.label)) return { state: 'in', daysLeftInPeak: peakEnd - days, label: `in peak, ${peakEnd - days} days left` };
+  return { state: 'past', daysPastPeak: days - peakEnd, label: `past peak by ${days - peakEnd} days` };
+}
+
+function sealedLine(bag, rank) {
+  const identity = [bag.name || 'unnamed coffee', bag.roaster, bag.origin, bag.process].filter(Boolean).join(', ');
+  const age = finite(bag.daysOffRoast) ? `${bag.daysOffRoast} days off roast, ` : '';
+  return `${rank}. ${identity}; ${age}${bag.peak.label}.`;
+}
+
+/**
+ * Unopened bags, ordered the way the app's Up Next ranks them
+ * (getRecommendations), with their own ref keys and character budget.
+ */
+export function buildSealedShelf(coffees = [], refs = {}) {
+  const all = Array.isArray(coffees) ? coffees : [];
+  const sealedTotal = all.filter((coffee) => coffee?.status === 'SEALED').length;
+  if (!sealedTotal) return { sealedShelf: [], sealedLines: [], sealedText: '', sealedMore: 0 };
+  const ordered = getRecommendations(all, sealedTotal).map((item) => item.bean);
+  const header = 'Sealed shelf (not opened yet; no brews or dial-in exist for these), best to open first:';
+  const moreLine = (count) => `+${count} more sealed ${count === 1 ? 'bag' : 'bags'} (not opened yet).`;
+  const sealedShelf = [];
+  const sealedLines = [header];
+  let chars = header.length;
+  for (const coffee of ordered.slice(0, MAX_SEALED_SHELF_BAGS)) {
+    const refKey = `c${canonicalHash({ id: coffee?.id || coffee?.name, shelf: 'sealed' }).slice(0, 8)}`;
+    const bag = {
+      refKey,
+      opened: false,
+      status: 'SEALED',
+      name: clip(coffee?.name || coffee?.coffeeName),
+      roaster: clip(coffee?.roaster),
+      origin: clip(coffee?.origin),
+      process: clip(coffee?.process),
+      roastDate: text(coffee?.roastDate) || null,
+      daysOffRoast: text(coffee?.roastDate) ? daysSinceRoast(coffee.roastDate, coffee) : null,
+      peak: sealedPeak(coffee),
+    };
+    const line = sealedLine(bag, sealedShelf.length + 1);
+    const remainingAfter = sealedTotal - sealedShelf.length - 1;
+    const reserve = remainingAfter > 0 ? 1 + moreLine(remainingAfter).length : 0;
+    if (chars + 1 + line.length + reserve > MAX_SEALED_SHELF_CHARS) break;
+    // Never let a sealed key shadow a rotation key for a different bag.
+    if (refs[refKey] && refs[refKey] !== (coffee?.id || null)) continue;
+    refs[refKey] = coffee?.id || null;
+    sealedShelf.push(bag);
+    sealedLines.push(line);
+    chars += 1 + line.length;
+  }
+  const sealedMore = sealedTotal - sealedShelf.length;
+  if (sealedMore > 0) sealedLines.push(moreLine(sealedMore));
+  return { sealedShelf, sealedLines, sealedText: sealedLines.join('\n'), sealedMore };
+}
+
 export function buildRotationSnapshot({ coffees = [], setup = {} } = {}) {
   const refs = {};
   const visible = (Array.isArray(coffees) ? coffees : []).filter((coffee) => coffee?.status !== 'FINISHED' && coffee?.status !== 'SEALED').sort((a, b) => Number(a?.jarSlot || 99) - Number(b?.jarSlot || 99)).slice(0, 3).map((coffee, index) => {
@@ -198,7 +273,8 @@ export function buildRotationSnapshot({ coffees = [], setup = {} } = {}) {
     boundedLines.push(value); chars += separator + value.length;
     if (value.length < line.length) break;
   }
-  return { version: 1, setup: { defaultMethod: setup.defaultMethod || null, grinder: setup.grinder || null, units: setup.units || 'metric', espressoMachine: setup.espressoMachine || null, espressoMachineName: setup.espressoMachineName || null, espressoBasketDoseGrams: setup.espressoBasketDoseGrams ?? null, espressoBasket: setup.espressoBasket || null, espressoGrinder: setup.espressoGrinder || null, espressoGrinderModel: setup.espressoGrinderModel || null, espressoGrinderCustomName: setup.espressoGrinderCustomName || null, espressoSetupConfirmed: setup.espressoSetupConfirmed === true }, coffees: visible, refs, lines: boundedLines, text: boundedLines.join('\n'), sealedCount: Number(setup.sealedCount || 0), finishedCount: Number(setup.finishedCount || 0) };
+  const shelf = buildSealedShelf(coffees, refs);
+  return { version: 1, setup: { defaultMethod: setup.defaultMethod || null, grinder: setup.grinder || null, units: setup.units || 'metric', espressoMachine: setup.espressoMachine || null, espressoMachineName: setup.espressoMachineName || null, espressoBasketDoseGrams: setup.espressoBasketDoseGrams ?? null, espressoBasket: setup.espressoBasket || null, espressoGrinder: setup.espressoGrinder || null, espressoGrinderModel: setup.espressoGrinderModel || null, espressoGrinderCustomName: setup.espressoGrinderCustomName || null, espressoSetupConfirmed: setup.espressoSetupConfirmed === true }, coffees: visible, refs, lines: boundedLines, text: boundedLines.join('\n'), ...(shelf.sealedShelf.length ? shelf : {}), sealedCount: Number(setup.sealedCount || 0), finishedCount: Number(setup.finishedCount || 0) };
 }
 
 function recipeFailureMarker(record, launchItem = null) {
@@ -353,7 +429,7 @@ export async function readCoffeeEvidence({ uid, coffeeId, launchItem = null, rea
     }
   };
   let [coffee, recipe, brews, tastings] = await Promise.all([
-    typeof readers.readCoffee === 'function' ? withTimeout(readers.readCoffee({ uid, coffeeId }), timeoutMs).then((value) => ({ kind: 'coffee', status: value ? 'available' : 'empty', coffee: clone(value), summary: value?.name ? `${value.name} is in your rotation.` : 'No coffee matched that reference.' })).catch((error) => ({ kind: 'coffee', status: 'unavailable', summary: "I couldn't check that coffee right now.", errorCode: error.code || 'read_failed' })) : { kind: 'coffee', status: 'empty', summary: 'No coffee matched that reference.' },
+    typeof readers.readCoffee === 'function' ? withTimeout(readers.readCoffee({ uid, coffeeId }), timeoutMs).then((value) => ({ kind: 'coffee', status: value ? 'available' : 'empty', coffee: clone(value), summary: value?.name ? (value.status === 'SEALED' ? `${value.name} is sealed on your shelf and not opened yet.` : `${value.name} is in your rotation.`) : 'No coffee matched that reference.' })).catch((error) => ({ kind: 'coffee', status: 'unavailable', summary: "I couldn't check that coffee right now.", errorCode: error.code || 'read_failed' })) : { kind: 'coffee', status: 'empty', summary: 'No coffee matched that reference.' },
     read('recipe', readers.readRecipe),
     read('brews', readers.readBrews || readers.readAttempts),
     read('tastings', readers.readTastings),

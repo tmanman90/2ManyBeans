@@ -1,5 +1,5 @@
 // Peak status utilities — ported from prototype lines 86-107
-import { C } from '../styles/theme';
+import { C } from '../styles/theme.js';
 
 export const today = () => {
   const d = new Date();

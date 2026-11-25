@@ -1,6 +1,6 @@
 // Recommendation engine — ported from prototype lines 109-142
 // Uses PROTOTYPE scoring (not PRD scoring which is wrong)
-import { getPeakStatus } from './peakStatus';
+import { getPeakStatus } from './peakStatus.js';
 
 // Optional trailing `onboardingPalate` (src/lib/palateProfile.js getOnboardingPalate()
 // shape) adds a final +/-0.1 tie-break term — never enough to override the real

@@ -143,6 +143,7 @@ function publicSnapshot(snapshot) {
     setup: { defaultMethod: displayMethod(snapshot.setup?.defaultMethod), grinder: snapshot.setup?.grinder || null, units: snapshot.setup?.units || 'metric', espressoMachine: snapshot.setup?.espressoMachine || null, espressoMachineName: snapshot.setup?.espressoMachineName || null, espressoBasketDoseGrams: snapshot.setup?.espressoBasketDoseGrams ?? null, espressoBasket: snapshot.setup?.espressoBasket || null, espressoGrinder: snapshot.setup?.espressoGrinder || null, espressoGrinderModel: snapshot.setup?.espressoGrinderModel || null, espressoGrinderCustomName: snapshot.setup?.espressoGrinderCustomName || null, espressoSetupConfirmed: snapshot.setup?.espressoSetupConfirmed === true },
     coffees: (snapshot.coffees || []).map((coffee) => ({ ...coffee, recipes: Array.isArray(coffee.recipes) ? coffee.recipes.slice() : [] })),
     lines: snapshot.lines.slice(), text: snapshot.text, sealedCount: snapshot.sealedCount, finishedCount: snapshot.finishedCount,
+    ...(snapshot.sealedShelf?.length ? { sealedShelf: clone(snapshot.sealedShelf), sealedLines: snapshot.sealedLines.slice(), sealedText: snapshot.sealedText, sealedMore: snapshot.sealedMore } : {}),
   };
 }
 function publicLaunchContext(value) {
