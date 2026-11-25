@@ -1,5 +1,6 @@
-// Professor Ruphus — story generation (GPT-5.4) + tasting score conversion (GPT-5.4 Mini)
+// Professor Ruphus: story generation (Claude Sonnet 5.5) + tasting score conversion (GPT-5.4 Mini)
 import { callOpenAI } from './openai';
+import { callClaude } from './claude';
 import { RUPHUS_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
 import { formatSourceInsightsForPrompt, sourceAxesToFlavorProfile } from './sourceInsights';
 
@@ -52,11 +53,11 @@ HALLUCINATION PREVENTION — THIS IS CRITICAL:
 
 TONE: Warm, enthusiastic, slightly nerdy professor who really loves coffee. First person ("I", "let me tell you"). Brief — the whole lesson should be a 60-90 second read (~200-300 words total across all sections).`;
 
-  const data = await callOpenAI({
-    model: 'gpt-5.4-mini',
+  const data = await callClaude({
+    model: 'claude-sonnet-5-5',
     feature: 'beanStory',
+    system: systemPrompt,
     messages: [
-      { role: 'system', content: systemPrompt },
       {
         role: 'user',
         content: `Write a Professor Ruphus lesson about this coffee:
@@ -89,7 +90,7 @@ Replace the 7s with your actual 1-10 estimates. Use null for any section you can
     maxTokens: 1200,
   });
 
-  const text = data.text || '';
+  const text = data.content?.map(c => c.text || '').join('') || '';
   const clean = text.replace(/```json|```/g, '').trim();
   const jsonMatch = clean.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {

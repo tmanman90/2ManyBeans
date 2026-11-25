@@ -3,11 +3,11 @@
 
 import { getPeakStatus, daysSinceRoast } from './peakStatus';
 import { getProfileForRoaster } from './roasterProfiles';
-import { API_BASE } from './apiBase';
+import { ruphusApiUrl } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
 import { formatSourceInsightsForPrompt } from './sourceInsights';
 
-const PROXY_URL = `${API_BASE}/api/openai`;
+const PROXY_URL = ruphusApiUrl('/api/openai');
 
 const REFERENCE_PROFILE_INDEX = `
 1. Kiss the Hippo Peru El Morito — Peru, Light, Washed, Bourbon/Caturra
@@ -122,12 +122,14 @@ export async function researchBean(bean) {
   const data = await fetchWithRetry({
     url: PROXY_URL,
     body: {
-      model: 'gpt-5.4-mini',
+      model: 'gpt-6-luna',
+      reasoningEffort: 'low',
       messages: [
         { role: 'system', content: RESEARCH_SYSTEM_PROMPT },
         { role: 'user', content: `Research this coffee bean:\n\n${beanDescription}` },
       ],
-      maxTokens: 600,
+      // Reasoning tokens count against this cap; 600 cut replies off.
+      maxTokens: 4000,
       feature: 'beanResearch',
     },
     retries: 2,

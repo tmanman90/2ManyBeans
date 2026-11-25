@@ -2,7 +2,7 @@
 // Mirrors the Aiden two-step pattern: researchBean() -> generateHandBrewRecipe()
 // Grinder data + family defaults + device configs + enforcement layer co-located here
 
-import { API_BASE } from './apiBase';
+import { ruphusApiUrl } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
 import { buildBeanDescription } from './beanResearch';
 import { HANDBREW_POUROVER_KNOWLEDGE, getOriginContext } from './coffeeKnowledge';
@@ -10,7 +10,7 @@ import { classifyFamilyFallback } from './beanFields';
 import { GRINDER_MICRON_SCALES, grinderSettingToMicrons, descriptorForMicrons, parseTimeString, normalizeStepTimes, isOdeStep, nearestOdeStep } from './brewMethods';
 export { parseTimeString } from './brewMethods';
 
-const PROXY_URL = `${API_BASE}/api/openai`;
+const PROXY_URL = ruphusApiUrl('/api/openai');
 
 // ---------------------------------------------------------------------------
 // Grinder pour-over start points (mirrors Aiden's FAMILY_GRIND_BANDS pattern)
@@ -616,7 +616,8 @@ BEAN CLASSIFICATION:
   const data = await fetchWithRetry({
     url: PROXY_URL,
     body: {
-      model: 'gpt-5.4-mini',
+      model: 'gpt-6.1-terra',
+      reasoningEffort: 'none',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userContent },

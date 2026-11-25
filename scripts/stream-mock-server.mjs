@@ -10,7 +10,7 @@
 //   POST /api/claude-stream?search=1  — first call emits NEEDS_SEARCH, second emits answer
 //   POST /api/claude-stream?error=mid — errors after 3 deltas ({type:'error'} frame)
 //   POST /api/claude                  — JSON path passthrough shape (single blob)
-//   POST /api/gemini                  — JSON search grounding mock
+//   POST /api/openai                  — JSON web search mock
 // Any other path: 404. CORS: permissive (harness only — never deployed).
 import http from 'node:http';
 
@@ -81,17 +81,15 @@ const server = http.createServer(async (req, res) => {
     return res.end(JSON.stringify({ content: [{ type: 'text', text: REPLY.join('') }], stop_reason: 'end_turn', usage: { input_tokens: 420, output_tokens: 96 } }));
   }
 
-  if (url.pathname === '/api/gemini') {
+  if (url.pathname === '/api/openai') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({
       text: 'Kenyan release roundup: washed Nyeri lots are showing blackcurrant, citrus, and molasses this season.',
-      groundingMetadata: {
-        groundingChunks: [
-          { web: { title: 'Kenyan Releases 2026', uri: 'https://example.com/kenya-2026' } },
-          { web: { title: 'Bad Script', uri: 'javascript:alert(1)' } },
-          { web: { title: 'App Link', uri: 'someapp://x' } },
-        ],
-      },
+      sources: [
+        { title: 'Kenyan Releases 2026', url: 'https://example.com/kenya-2026' },
+        { title: 'Bad Script', url: 'javascript:alert(1)' },
+        { title: 'App Link', url: 'someapp://x' },
+      ],
     }));
   }
 

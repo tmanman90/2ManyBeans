@@ -274,7 +274,7 @@ test('bean writers stamp strict client versions and telemetry TTL policy is sour
   assert.equal(appData.includes('ruphusCensus'), false);
 });
 
-test('native dev builds route only Ruphus authority calls to the preview backend', () => {
+test('native dev builds route Ruphus authority and AI proxy calls to the preview backend', () => {
   const apiBase = fs.readFileSync(new URL('../src/lib/apiBase.js', import.meta.url), 'utf8');
   const chat = fs.readFileSync(new URL('../src/tabs/ChatTab.jsx', import.meta.url), 'utf8');
   const commands = fs.readFileSync(new URL('../src/lib/recipeCommands.js', import.meta.url), 'utf8');
@@ -289,5 +289,9 @@ test('native dev builds route only Ruphus authority calls to the preview backend
   assert.match(commands, /ruphusApiUrl\('\/api\/recipe-command'\)/);
   assert.match(tasting, /ruphusApiUrl\('\/api\/ruphus-tasting'\)/);
   assert.match(aiden, /ruphusApiUrl\('\/api\/aiden'\)/);
-  assert.match(chat, /API_BASE.*\/api\/claude-stream/s);
+  assert.match(chat, /ruphusApiUrl\('\/api\/claude-stream'\)/);
+  for (const [file, path] of [['claude.js', '/api/claude'], ['openai.js', '/api/openai'], ['gemini.js', '/api/gemini'], ['gemini.js', '/api/product-shot'], ['beanResearch.js', '/api/openai'], ['handbrew.js', '/api/openai']]) {
+    const source = fs.readFileSync(new URL(`../src/lib/${file}`, import.meta.url), 'utf8');
+    assert.ok(source.includes(`ruphusApiUrl('${path}')`), `${file} must call ${path} through ruphusApiUrl`);
+  }
 });

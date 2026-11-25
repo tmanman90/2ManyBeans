@@ -6,7 +6,7 @@
 //   (default)        -- Generate AI product shot (free quota or Pro required)
 //   upload-original  -- Upload user's original photo (any authenticated user)
 //   delete           -- Clean up orphaned Storage files
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI, { toFile } from 'openai';
 import sharp from 'sharp';
 import { normalizeProductShotBg } from './_lib/productShotBg.js';
 import { withCorsAuth, getStorageBucket, adminGetDownloadURL, getDb, enforceUserRateLimit } from './_lib/cors-auth.js';
@@ -19,10 +19,13 @@ const QUOTA_RESERVATION_TTL_MS = 10 * 60 * 1000;
 const PRODUCT_SHOT_RATE_LIMIT = { key: 'productShot', limit: 20, windowMs: 60 * 60 * 1000 };
 const PHOTO_UPLOAD_RATE_LIMIT = { key: 'photoUpload', limit: 60, windowMs: 60 * 60 * 1000 };
 
-let genAI;
+// gpt-image-2.6-sunburst at medium quality won Tal's blind review of 30 shots
+// (2026-11-24): 0 of 6 rejected against 3 of 6 for the old Gemini preview.
+const IMAGE_MODEL = 'gpt-image-2.6-sunburst';
+let openai;
 function getClient() {
-  if (!genAI) genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  return genAI;
+  if (!openai) openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 2 });
+  return openai;
 }
 
 const PRODUCT_SHOT_PROMPT = `You are a product photography AI. Generate a NEW studio product photo of this coffee bag.
@@ -345,7 +348,7 @@ export default withCorsAuth(async (req, res, decodedToken) => {
   }
 
   // Reprocess: download existing product shot, normalize background, re-upload.
-  // No Gemini call — just fixes the background color on existing photos.
+  // No image model call: just fixes the background color on existing photos.
   if (action === 'reprocess') {
     try {
       const bucket = getStorageBucket();
@@ -375,41 +378,21 @@ export default withCorsAuth(async (req, res, decodedToken) => {
   }
 
   try {
-    // Step 1: Generate product shot via Gemini
-    const client = getClient();
-    const model = client.getGenerativeModel({
-      model: 'gemini-3.1-flash-image-preview',
-      generationConfig: { responseModalities: ['IMAGE', 'TEXT'] },
+    // Step 1: Generate product shot. The upload is re-encoded as JPEG first
+    // because the image model does not take HEIC.
+    const source = await normalizeUserPhoto(photo.base64);
+    const result = await getClient().images.edit({
+      model: IMAGE_MODEL,
+      image: await toFile(source, 'bag.jpg', { type: 'image/jpeg' }),
+      prompt: PRODUCT_SHOT_PROMPT,
+      size: '1024x1024',
+      quality: 'medium',
     });
 
-    const result2 = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [
-          { inlineData: { mimeType: photo.mimeType, data: photo.base64 } },
-          { text: PRODUCT_SHOT_PROMPT },
-        ],
-      }],
-    });
+    logApiUsage({ uid, provider: 'openai', model: IMAGE_MODEL, feature: 'productShot', endpoint: '/api/product-shot', usage: result.usage });
 
-    logApiUsage({ uid, provider: 'gemini', model: 'gemini-3.1-flash-image-preview', feature: 'productShot', endpoint: '/api/product-shot', usage: result2.response?.usageMetadata });
-
-    // Extract image from response
-    let imageBase64;
-    for (const candidate of result2.response.candidates || []) {
-      for (const part of candidate.content?.parts || []) {
-        if (part.inlineData) {
-          imageBase64 = part.inlineData.data;
-          break;
-        }
-      }
-      if (imageBase64) break;
-    }
-
-    if (!imageBase64) {
-      const blockReason = result2.response.promptFeedback?.blockReason;
-      throw new Error(blockReason ? `Image blocked: ${blockReason}` : 'No image generated');
-    }
+    const imageBase64 = result.data?.[0]?.b64_json;
+    if (!imageBase64) throw new Error('No image generated');
 
     // Step 2: Normalize background to card color, then convert to JPEG
     const pngBuffer = Buffer.from(imageBase64, 'base64');

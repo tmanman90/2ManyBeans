@@ -1,25 +1,29 @@
-// Gemini API helpers -- all calls go through /api/gemini serverless proxy
-// No Google SDK in the browser. No API key in client code.
-import { API_BASE } from './apiBase';
+// Bag scan, bean research, chat web search and photo description helpers.
+// Calls go through the /api/gemini and /api/openai serverless proxies.
+// No SDK in the browser. No API key in client code.
+import { ruphusApiUrl } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
+import { callOpenAI } from './openai';
 import { normalizeSourceInsights } from './sourceInsights';
 
-const PROXY_URL = `${API_BASE}/api/gemini`;
+const PROXY_URL = ruphusApiUrl('/api/gemini');
 
-export async function callGemini({ model, contents, systemInstruction, maxTokens = 1500, tools, retries = 2, metered = false, feature, responseMimeType }) {
+export async function callGemini({ model, contents, systemInstruction, maxTokens = 1500, tools, retries = 2, metered = false, feature, responseMimeType, thinkingLevel }) {
   const body = { model, contents, systemInstruction, maxTokens };
   if (tools) body.tools = tools;
+  if (thinkingLevel) body.thinkingLevel = thinkingLevel;
   if (metered) body.metered = true;
   if (feature) body.feature = feature;
   if (responseMimeType) body.responseMimeType = responseMimeType;
   return fetchWithRetry({ url: PROXY_URL, body, retries, serviceName: 'Gemini' });
 }
 
-// --- Bean label scanning (multi-photo, deep analysis) via Gemini 2.5 Flash ---
+// --- Bean label scanning (multi-photo, deep analysis) via GPT-6.2 Sol ---
 
 export async function scanBeanLabel(photos) {
   const imageParts = photos.map(p => ({
-    inlineData: { mimeType: p.mediaType, data: p.base64 },
+    type: 'image_url',
+    image_url: { url: `data:${p.mediaType};base64,${p.base64}` },
   }));
 
   const scanPrompt = `You are an expert specialty coffee label reader. You have been given ${photos.length} photo(s) of a coffee bag.
@@ -126,21 +130,21 @@ If a field is not visible, use an empty string (or 100 for bagSize). If no pamph
   // Bean scan IS the metered action for the aiScans free-tier counter.
   // This call burns one credit. Research enrichment + image analysis are
   // separate calls that don't pass `metered: true`.
-  const data = await callGemini({
-    contents: [{
-      parts: [...imageParts, { text: scanPrompt }],
-    }],
+  const data = await callOpenAI({
+    model: 'gpt-6.2-sol',
+    reasoningEffort: 'low',
+    messages: [{ role: 'user', content: [...imageParts, { type: 'text', text: scanPrompt }] }],
     maxTokens: 4000,
     metered: true,
     feature: 'beanScan',
-    responseMimeType: 'application/json',
+    responseFormat: { type: 'json_object' },
   });
 
   const text = data.text || '';
   const clean = text.replace(/```(?:json)?/gi, '').trim();
   const jsonMatch = clean.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    if (data.finishReason === 'MAX_TOKENS') {
+    if (data.finishReason === 'length') {
       throw new Error('The scan found a lot of label text and ran long. Please try again with fewer photos, or crop the insert closer.');
     }
     throw new Error('The scan result came back in a format I could not read. Please try again.');
@@ -149,7 +153,7 @@ If a field is not visible, use an empty string (or 100 for bagSize). If no pamph
   try {
     parsed = JSON.parse(jsonMatch[0]);
   } catch {
-    if (data.finishReason === 'MAX_TOKENS') {
+    if (data.finishReason === 'length') {
       throw new Error('The scan found a lot of label text and ran long. Please try again with fewer photos, or crop the insert closer.');
     }
     throw new Error('The scan result came back incomplete. Please try again.');
@@ -163,7 +167,7 @@ If a field is not visible, use an empty string (or 100 for bagSize). If no pamph
   return parsed;
 }
 
-// --- Web search + Reddit research for bean enrichment via Gemini search grounding ---
+// --- Web search + Reddit research for bean enrichment via Gemini 4 Hydrogen search grounding ---
 
 // `metered` defaults to false because this function is most often called
 // as the post-scan enrichment step (already charged). Set `metered: true`
@@ -219,8 +223,10 @@ Return a JSON object with ONLY fields you found reliable data for. Empty string 
   "redditNotes": "community tasting notes or reviews from Reddit if found"
 }` }],
     }],
+    model: 'gemini-4-hydrogen',
+    thinkingLevel: 'low',
     tools: [{ googleSearch: {} }],
-    maxTokens: 1500,
+    maxTokens: 4000,
     feature: 'webResearch',
   });
 
@@ -235,19 +241,17 @@ Return a JSON object with ONLY fields you found reliable data for. Empty string 
 }
 
 export async function searchWeb(query) {
-  const data = await callGemini({
-    model: 'gemini-2.5-flash',
-    contents: [{ role: 'user', parts: [{ text: query }] }],
-    tools: [{ googleSearch: {} }],
+  const data = await callOpenAI({
+    model: 'gpt-6.1-terra',
+    reasoningEffort: 'low',
+    webSearch: true,
+    messages: [{ role: 'user', content: query }],
     feature: 'chatSearch',
-    maxTokens: 800,
+    maxTokens: 4000,
   });
 
-  const chunks = (data.groundingMetadata?.groundingChunks || [])
-    .map(chunk => ({
-      title: chunk.web?.title || '',
-      uri: chunk.web?.uri || '',
-    }))
+  const chunks = (data.sources || [])
+    .map(source => ({ title: source.title || '', uri: source.url || '' }))
     .filter(chunk => chunk.title || chunk.uri);
 
   return {
@@ -261,7 +265,7 @@ export async function searchWeb(query) {
 
 export async function generateProductShot(photo, beanId, { skipFirestoreWrite = false } = {}) {
   const data = await fetchWithRetry({
-    url: `${API_BASE}/api/product-shot`,
+    url: ruphusApiUrl('/api/product-shot'),
     body: { photo: { base64: photo.base64, mimeType: photo.mediaType }, beanId, skipFirestoreWrite },
     serviceName: 'Product Shot',
     retries: 0,
@@ -278,7 +282,7 @@ export async function generateProductShot(photo, beanId, { skipFirestoreWrite = 
 // Delete an orphaned product shot from Storage (for cancel/rescan cleanup)
 export async function deleteProductShot(beanId) {
   return fetchWithRetry({
-    url: `${API_BASE}/api/product-shot`,
+    url: ruphusApiUrl('/api/product-shot'),
     body: { action: 'delete', beanId },
     serviceName: 'Product Shot Cleanup',
     retries: 0,
@@ -300,7 +304,9 @@ export async function describeImage(photos) {
         { text: 'Describe this image in detail. If it is a coffee bag, read all visible text including roaster name, coffee name, origin, variety, process, roast date, tasting notes, and any other information. Include text from all orientations (rotated, vertical, sideways).' },
       ],
     }],
-    maxTokens: 800,
+    model: 'gemini-4-hydrogen',
+    thinkingLevel: 'low',
+    maxTokens: 4000,
     feature: 'imageAnalysis',
   });
 

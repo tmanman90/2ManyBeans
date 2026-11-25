@@ -1,16 +1,23 @@
 /** Single dated pricing authority shared by telemetry and evaluation. */
-export const PRICING_REGISTRY_VERSION = '2026-08-28.1';
-export const PRICING_REGISTRY_SOURCE = 'provider-pricing-pages-2026-08-28';
+export const PRICING_REGISTRY_VERSION = '2026-11-24.1';
+export const PRICING_REGISTRY_SOURCE = 'provider-pricing-pages-2026-11-24';
 export const LONG_CONTEXT_THRESHOLD = 272_000;
 export const MODEL_PRICING = Object.freeze({
   'gpt-5.6-luna': Object.freeze({ input: 0.20, output: 1.20, cacheRead: 0.02, cacheWrite: 0.25, source: 'https://developers.openai.com/api/docs/models/gpt-5.6-luna' }),
   'gpt-5.6-terra': Object.freeze({ input: 2, output: 12, cacheRead: 0.20, cacheWrite: 2.50, source: 'https://developers.openai.com/api/docs/models/gpt-5.6-terra' }),
-  'gpt-5.4': Object.freeze({ input: 2.50, output: 15, cacheRead: 0.25, cacheWrite: 3.125, longContextInputMultiplier: 2, longContextOutputMultiplier: 1.5, source: 'https://developers.openai.com/api/docs/models' }),
   'gpt-5.4-mini': Object.freeze({ input: 0.75, output: 4.50, cacheRead: 0.075, cacheWrite: 0.9375, source: 'https://developers.openai.com/api/docs/models' }),
+  'gpt-6-luna': Object.freeze({ input: 0.10, output: 0.50, cacheRead: 0.01, cacheWrite: 0.125, source: 'https://developers.openai.com/api/docs/pricing' }),
+  'gpt-6.1-terra': Object.freeze({ input: 1, output: 5, cacheRead: 0.05, cacheWrite: 1.25, source: 'https://developers.openai.com/api/docs/pricing' }),
+  'gpt-6.2-sol': Object.freeze({ input: 2, output: 10, cacheRead: 0.10, cacheWrite: 2.50, source: 'https://developers.openai.com/api/docs/pricing' }),
+  'gpt-image-2.6-sunburst': Object.freeze({ status: 'current', unsupported: true, source: 'https://developers.openai.com/api/docs/pricing' }),
+  'claude-sonnet-5-5': Object.freeze({ input: 2, output: 10, cacheRead: 0.10, cacheWrite: 2.50, source: 'https://platform.claude.com/docs/en/about-claude/pricing' }),
+  'claude-haiku-5-5': Object.freeze({ input: 0.10, output: 0.50, cacheRead: 0.01, cacheWrite: 0.125, source: 'https://platform.claude.com/docs/en/about-claude/pricing' }),
+  'gemini-4-hydrogen': Object.freeze({ input: 1.50, output: 7.50, cacheRead: 0.075, cacheWrite: 0, source: 'https://ai.google.dev/gemini-api/docs/pricing' }),
+  'gemini-2.5-flash': Object.freeze({ input: 0.30, output: 2.50, cacheRead: 0.03, cacheWrite: 0, source: 'https://ai.google.dev/gemini-api/docs/pricing' }),
+  'gpt-5.4': Object.freeze({ input: 2.50, output: 15, cacheRead: 0.25, cacheWrite: 3.125, longContextInputMultiplier: 2, longContextOutputMultiplier: 1.5, source: 'https://developers.openai.com/api/docs/models' }),
   'claude-sonnet-5': Object.freeze({ input: 2, output: 10, cacheRead: 0.20, cacheWrite: 2.50, cacheWrite1h: 4, source: 'https://platform.claude.com/docs/en/about-claude/pricing' }),
   'claude-sonnet-4-6': Object.freeze({ input: 3, output: 15, cacheRead: 0.30, cacheWrite: 3.75, source: 'https://platform.claude.com/docs/en/about-claude/pricing' }),
   'claude-haiku-4-5-20251001': Object.freeze({ input: 1, output: 5, cacheRead: 0.10, cacheWrite: 1.25, cacheWrite1h: 2, source: 'https://platform.claude.com/docs/en/about-claude/pricing' }),
-  'gemini-2.5-flash': Object.freeze({ input: 0.30, output: 2.50, cacheRead: 0.03, cacheWrite: 0, source: 'https://ai.google.dev/gemini-api/docs/pricing' }),
   'gemini-2.5-flash-preview-05-20': Object.freeze({ status: 'retired', unsupported: true, source: 'https://ai.google.dev/gemini-api/docs/deprecations' }),
   'gemini-3.1-flash-image-preview': Object.freeze({ status: 'retired', unsupported: true, source: 'https://ai.google.dev/gemini-api/docs/deprecations' }),
   'gemini-3.1-flash-image': Object.freeze({ status: 'current', unsupported: true, source: 'https://ai.google.dev/gemini-api/docs/pricing' }),
@@ -91,5 +98,5 @@ export function priceUsage({ model, provider, usage }, registry = MODEL_PRICING)
   return tokens && cost != null ? { tokens, cost, model, provider, pricingVersion: PRICING_REGISTRY_VERSION } : null;
 }
 export function snapshotPricing(registry = MODEL_PRICING) {
-  return { version: PRICING_REGISTRY_VERSION, source: PRICING_REGISTRY_SOURCE, capturedAt: '2026-08-28', models: Object.fromEntries(Object.entries(registry).map(([model, price]) => [model, { ...price }])) };
+  return { version: PRICING_REGISTRY_VERSION, source: PRICING_REGISTRY_SOURCE, capturedAt: '2026-11-24', models: Object.fromEntries(Object.entries(registry).map(([model, price]) => [model, { ...price }])) };
 }

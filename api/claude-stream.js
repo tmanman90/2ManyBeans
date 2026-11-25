@@ -5,6 +5,7 @@ import { withCorsAuthPro } from './_lib/cors-auth.js';
 import { logApiUsage } from './_lib/costLogger.js';
 import {
   ALLOWED_MODELS,
+  CHAT_MODEL,
   FALLBACK_MODEL,
   RATE_LIMIT,
   buildClaudeParams,
@@ -119,13 +120,13 @@ async function runStream({ params, req, res, decodedToken }) {
 
 export default withCorsAuthPro(async (req, res, decodedToken) => {
   try {
-    const { system, messages, maxTokens = 1000, model: requestedModel = 'claude-sonnet-5' } = req.body;
+    const { system, messages, maxTokens = 1000, model: requestedModel = CHAT_MODEL } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'messages array is required' });
     }
 
-    const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : 'claude-sonnet-5';
+    const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : CHAT_MODEL;
     let params = buildClaudeParams({ model, maxTokens, system, messages });
 
     try {

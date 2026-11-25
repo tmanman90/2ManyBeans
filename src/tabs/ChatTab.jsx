@@ -9,7 +9,7 @@ import { haptic } from '../lib/haptics';
 import { buildChatContext, compressImage, prepareChatMessagesForClaude } from '../lib/claude';
 import { getOnboardingPalate, palateSummaryLine } from '../lib/palateProfile';
 import { searchWeb } from '../lib/gemini';
-import { API_BASE, ruphusApiUrl } from '../lib/apiBase';
+import { ruphusApiUrl } from '../lib/apiBase';
 import { streamWithAuth, resolveTerminal, holdBackScan } from '../lib/streamChat';
 import { chatErrorMessage } from '../lib/fetchWithRetry';
 import { AidenModal } from '../components/AidenModal';
@@ -1257,12 +1257,12 @@ export const ChatTab = ({ beans, tastings, addBean, updateBean, saveHandBrewTimi
 
             return new Promise((passResolve, passReject) => {
               streamWithAuth({
-                url: `${API_BASE}/api/claude-stream`,
+                url: ruphusApiUrl('/api/claude-stream'),
                 body: {
                   system: systemPrompt,
                   messages: prepared.messages,
                   maxTokens: prepared.hasImages ? 2600 : 800,
-                  model: 'claude-sonnet-5',
+                  model: 'claude-sonnet-5-5',
                   feature: 'chat',
                 },
                 signal: abortController.signal,

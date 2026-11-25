@@ -1,5 +1,6 @@
-// Claude API helpers -- all calls go through /api/claude serverless proxy
-// No Anthropic SDK in the browser. No API key in client code.
+// Professor Ruphus prompt helpers: chat context, tasting coach reactions and
+// rotation recommendations. Calls go through the /api/claude and /api/openai
+// serverless proxies. No SDK in the browser. No API key in client code.
 import { today, getPeakStatus, daysOpen } from './peakStatus';
 import {
   RUPHUS_KNOWLEDGE,
@@ -13,8 +14,9 @@ import {
 } from './coffeeKnowledge';
 import { GRINDER_LABELS } from './brewMethods';
 import { summarizeSourceInsights } from './sourceInsights';
-import { API_BASE } from './apiBase';
+import { ruphusApiUrl } from './apiBase';
 import { fetchWithRetry } from './fetchWithRetry';
+import { callOpenAI } from './openai';
 import { stripMarkdown } from './textFormat';
 import { buildPalateSummary } from './palateSummary.js';
 import { formatBrewContext, isMilkDrink } from './brewContext.js';
@@ -41,9 +43,9 @@ function validateGrinderKey(x) {
   return VALID_GRINDER_KEYS.has(x) ? x : 'fellow-ode-gen2';
 }
 
-const PROXY_URL = `${API_BASE}/api/claude`;
+const PROXY_URL = ruphusApiUrl('/api/claude');
 
-export async function callClaude({ system, messages, maxTokens = 1000, model = 'claude-haiku-4-5-20251001', tools, metered = false, feature }) {
+export async function callClaude({ system, messages, maxTokens = 1000, model, tools, metered = false, feature }) {
   const body = { system, messages, maxTokens, model };
   if (tools) body.tools = tools;
   if (metered) body.metered = true;
@@ -109,15 +111,21 @@ export function compressImage(file) {
 // --- Bean scanning and web research now in src/lib/gemini.js ---
 
 export async function getRecBlurb(activeDesc, recDesc) {
-  const data = await callClaude({
-    system: `You're a concise specialty coffee advisor. Given a current rotation and candidate beans, write a brief 2-4 sentence analysis of why each candidate would complement the rotation. Consider: timing urgency (fading beans first), flavor variety (different origins/processes from what's active), and peak window. Be warm and opinionated.
+  const system = `You're a concise specialty coffee advisor. Given a current rotation and candidate beans, write a brief 2-4 sentence analysis of why each candidate would complement the rotation. Consider: timing urgency (fading beans first), flavor variety (different origins/processes from what's active), and peak window. Be warm and opinionated.
 
-FORMATTING: Plain text only. NO markdown. NEVER use asterisks (*), pound signs (#), or any markdown formatting -- your output renders as literal text in a mobile card and markdown syntax shows up as garbage. Write in flowing sentences, no headers, no bullets, no bold, no italic.`,
-    messages: [{ role: 'user', content: `Current rotation:\n${activeDesc || "(empty)"}\n\nTop candidates:\n${recDesc}\n\nWhy would each be a good pick?` }],
-    maxTokens: 400,
+FORMATTING: Plain text only. NO markdown. NEVER use asterisks (*), pound signs (#), or any markdown formatting -- your output renders as literal text in a mobile card and markdown syntax shows up as garbage. Write in flowing sentences, no headers, no bullets, no bold, no italic.`;
+  // Reasoning tokens count against maxTokens, so the cap leaves room for them.
+  const data = await callOpenAI({
+    model: 'gpt-6.1-terra',
+    reasoningEffort: 'low',
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: `Current rotation:\n${activeDesc || "(empty)"}\n\nTop candidates:\n${recDesc}\n\nWhy would each be a good pick?` },
+    ],
+    maxTokens: 4000,
     feature: 'recommendation',
   });
-  const raw = data.content?.map(c => c.text || '').join('') || '';
+  const raw = data.text || '';
   // Belt-and-suspenders: strip any markdown that slipped through the prompt.
   return stripMarkdown(raw);
 }
@@ -475,13 +483,18 @@ You are reacting to their observation on the "${sanitize(step.title, 30)}" step 
 ${expectedLine ? `For context, you expected: ${expectedLine}` : ''}
 Reply in ONE or TWO short sentences. Affirm what they noticed, gently sharpen it, and if useful nudge toward what to feel next. Encouraging, specific, never a lecture. No markdown, no lists, no emoji.`;
   try {
-    const data = await callClaude({
-      system,
-      messages: [{ role: 'user', content: String(userText).slice(0, 400) }],
-      maxTokens: 110,
+    // Reasoning tokens count against maxTokens; the prompt keeps the reply short.
+    const data = await callOpenAI({
+      model: 'gpt-6-luna',
+      reasoningEffort: 'low',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: String(userText).slice(0, 400) },
+      ],
+      maxTokens: 4000,
       feature: 'tastingCoach',
     });
-    const raw = data.content?.map(c => c.text || '').join('') || '';
+    const raw = data.text || '';
     return stripMarkdown(raw).trim();
   } catch {
     return '';

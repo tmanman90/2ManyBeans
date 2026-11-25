@@ -7,7 +7,9 @@ export const API_BASE = Capacitor.isNativePlatform()
 const isDevVariant = typeof __APP_VARIANT__ !== 'undefined' && __APP_VARIANT__ === 'dev';
 const configuredRuphusBase = String(import.meta.env?.VITE_RUPHUS_API_BASE || '').trim().replace(/\/$/, '');
 
-// Native dev builds use the isolated preview backend for Agent v3 authority.
+// Native dev builds use the isolated preview backend for Agent v3 authority
+// and every AI proxy call, so model changes can be tried on the Dev app
+// without touching the production API.
 // Missing configuration fails closed instead of falling through to production.
 export const RUPHUS_API_BASE = Capacitor.isNativePlatform() && isDevVariant
   ? configuredRuphusBase

@@ -18,7 +18,8 @@ function getClient() {
 // { action: 'productShot' } and bypass the Pro gate while burning a scan
 // credit. See todos/008-pending-p1-legacy-productShot-in-gemini-proxy.md.
 
-const ALLOWED_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-preview-05-20', 'gemini-3.1-flash-image-preview'];
+const ALLOWED_MODELS = ['gemini-2.5-flash', 'gemini-4-hydrogen'];
+const ALLOWED_THINKING_LEVELS = new Set(['low', 'medium', 'high']);
 const ALLOWED_RESPONSE_MIME_TYPES = new Set(['application/json']);
 const MAX_TOKENS_CAP = 4000;
 const RATE_LIMIT = { key: 'gemini', limit: 120, windowMs: 60 * 60 * 1000 };
@@ -31,6 +32,7 @@ async function handleText(req, res, feature, decodedToken) {
     maxTokens = 1500,
     tools,
     responseMimeType,
+    thinkingLevel,
   } = req.body;
 
   if (!contents) {
@@ -40,6 +42,9 @@ async function handleText(req, res, feature, decodedToken) {
   const model = ALLOWED_MODELS.includes(requestedModel) ? requestedModel : 'gemini-2.5-flash';
   const safeMaxTokens = Math.min(maxTokens || 1500, MAX_TOKENS_CAP);
   const safeResponseMimeType = ALLOWED_RESPONSE_MIME_TYPES.has(responseMimeType) ? responseMimeType : undefined;
+  // Thinking tokens count against maxOutputTokens, so a thinking model needs
+  // an explicit level or it can spend the whole cap and cut the reply off.
+  const safeThinkingLevel = ALLOWED_THINKING_LEVELS.has(thinkingLevel) ? thinkingLevel : undefined;
 
   const client = getClient();
   const generativeModel = client.getGenerativeModel({
@@ -49,6 +54,7 @@ async function handleText(req, res, feature, decodedToken) {
     generationConfig: {
       maxOutputTokens: safeMaxTokens,
       ...(safeResponseMimeType && { responseMimeType: safeResponseMimeType }),
+      ...(safeThinkingLevel && { thinkingConfig: { thinkingLevel: safeThinkingLevel } }),
     },
   });
 
