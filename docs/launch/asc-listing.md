@@ -67,7 +67,17 @@ Everything in Pro, plus direct push of your recipes to a Fellow Aiden brewer.
 Both tiers start with a 3-day free trial. Cancel anytime from the App Store subscription settings.
 
 Built by a home brewer who got tired of apps that treat coffee like a to-do list.
+
+SUBSCRIPTION TERMS
+
+Payment is charged to your Apple ID account at confirmation of purchase, after any free trial ends. Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.
+
+Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Terms of Service: https://2manybeans.vercel.app/terms.html
+Privacy Policy: https://2manybeans.vercel.app/privacy-policy.html
 ```
+
+The Terms of Use (EULA) link is required. App Review rejected 1.1 on 2026-11-26 under Guideline 3.1.2 because the description had none. The app uses Apple's standard EULA (no custom EULA in App Store Connect), so the link must stay in the description of every localization.
 
 ### Keywords (100 char max, comma-separated)
 ```
@@ -399,5 +409,6 @@ Summary of what to capture on an iPhone 16 simulator (6.1"):
 - [ ] Review notes + sign-in info pasted
 - [ ] Privacy Policy URL live
 - [ ] Terms URL live
+- [ ] Description of every localization links the Terms of Use (EULA) (Guideline 3.1.2)
 - [ ] Support URL live (create support.html)
 - [ ] Submit for Review
