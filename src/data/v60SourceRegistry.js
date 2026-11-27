@@ -68,7 +68,7 @@ export const V60_SOURCES = Object.freeze([
     ratio: 15, temperatureC: 92, assumedFields: ['temperature'], grind: 'medium-coarse (about 850 microns, estimated from a photo)',
     guideSeconds: 90, guideRangeSeconds: [85, 95], earlyPull: true,
     pourTargets: [{ seconds: 0, grams: 60 }, { seconds: 35, grams: 120 }, { seconds: 70, grams: 180 }], pourSeconds: 10, restSeconds: 25, pullAfterPourSeconds: 5,
-    geometry: 'three equal center pours, spout held just above the bed, thin slow stream', agitation: 'no stir and no swirl; the dripper is lifted off before it finishes draining', executableCadence: true,
+    geometry: 'spout below the dripper rim, thin stream about 6 g/s; pour 1 holds the center 2-3 s then small circles about once a second, pour 2 small circles throughout, pour 3 circles for about 5 s then holds still in the center', agitation: 'no stir and no swirl; the dripper is lifted off before it finishes draining', executableCadence: true,
   },
 ]);
 
@@ -80,7 +80,7 @@ export const V60_TECHNIQUES = Object.freeze({
   gentle: { id: 'gentle-main-pour', sourceIds: ['heart-continuous-v1'], label: 'gentle continuous main pour' },
   controlled: { id: 'kurasu-controlled-pulses', sourceIds: ['kurasu-controlled-pulses-v1'], label: 'controlled low-radius pulses' },
   // Explicit-choice only: the automatic selector never picks it.
-  mameya: { id: 'mameya-three-pour', sourceIds: ['mameya-three-pour-observed-v1'], label: 'three gentle center pours with an early pull' },
+  mameya: { id: 'mameya-three-pour', sourceIds: ['mameya-three-pour-observed-v1'], label: 'three gentle spiral pours with an early pull' },
 });
 
 export function sourceById(id) { return V60_SOURCES.find((source) => source.id === id) || null; }

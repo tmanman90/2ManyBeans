@@ -3,7 +3,7 @@ import { buildTimerSteps } from './brewTimerSteps.js';
 import { V60_SOURCE_REGISTRY_VERSION, V60_RULES, V60_SOURCES, V60_TECHNIQUES, sourceById, isKnownV60ParameterSource } from '../data/v60SourceRegistry.js';
 
 export const V60_ENGINE_VERSION = 'v60-hot-engine-v3';
-export const V60_RULES_VERSION = 'v60-hot-rules-v3';
+export const V60_RULES_VERSION = 'v60-hot-rules-v4-spiral-copy';
 export const V60_CONFIGURATION_KEY = 'v60:02:standard-paper';
 export const V60_PHASE_CONTRACT_VERSION = 1;
 export const V60_ADAPTATION_RULE_ID = 'v60-adaptation-bounded-v1';
@@ -131,16 +131,16 @@ function techniqueShape(technique, dose, water, source, intent = {}) {
   ];
   if (technique.id === 'kasuya-coarse-pulses' && source.id === 'kasuya-46-v1' && dose === source.doseGrams
     && water === round(source.doseGrams * source.ratio) && Array.isArray(source.pourTargets)) return source.pourTargets.map((target, index) => [target.seconds, target.grams, index === 0
-    ? `Pour ${target.grams}g in the center, then let it drain until 0:45. Do not swirl.`
+    ? `Pour ${target.grams}g starting in the center, then in small circles outward, staying off the paper. Let it drain until 0:45. Do not swirl.`
     : index === source.pourTargets.length - 1
-      ? `Pour the final centered pulse to ${target.grams}g total, then let it drain without swirling.`
-      : `Pour a centered pulse to ${target.grams}g total over about 10 seconds, then let it drain.`, index === 0 ? 'First pour' : index === source.pourTargets.length - 1 ? 'Final pour' : `Pour ${index + 1}`]);
+      ? `Pour the final pulse to ${target.grams}g total in the same small circles from the center, then let it drain without swirling.`
+      : `Pour a pulse to ${target.grams}g total in small circles from the center over about 10 seconds, then let it drain.`, index === 0 ? 'First pour' : index === source.pourTargets.length - 1 ? 'Final pour' : `Pour ${index + 1}`]);
   if (technique.id === 'kasuya-coarse-pulses') return [
-    [0, round(water / 6), `Pour ${round(water / 6)}g in the center over about 10 seconds, then let it drain. Do not swirl.`, 'First pour'],
-    [45, round(water * 0.4), `Pour a centered pulse to ${round(water * 0.4)}g total over about 10 seconds, then let it drain.`, 'Second pour'],
-    [90, round(water * 0.6), `Pour gently to ${round(water * 0.6)}g total over about 10 seconds.`, 'Third pour'],
-    [130, round(water * 0.8), `Pour gently to ${round(water * 0.8)}g total over about 10 seconds.`, 'Fourth pour'],
-    [160, water, `Pour the final centered pulse to ${water}g total, then let it drain without swirling.`, 'Final pour'],
+    [0, round(water / 6), `Pour ${round(water / 6)}g starting in the center, then in small circles outward over about 10 seconds, staying off the paper. Let it drain. Do not swirl.`, 'First pour'],
+    [45, round(water * 0.4), `Pour a pulse to ${round(water * 0.4)}g total in small circles from the center over about 10 seconds, then let it drain.`, 'Second pour'],
+    [90, round(water * 0.6), `Pour gently in the same small circles to ${round(water * 0.6)}g total over about 10 seconds.`, 'Third pour'],
+    [130, round(water * 0.8), `Pour gently in the same small circles to ${round(water * 0.8)}g total over about 10 seconds.`, 'Fourth pour'],
+    [160, water, `Pour the final pulse to ${water}g total in the same small circles, then let it drain without swirling.`, 'Final pour'],
   ];
   if (technique.id === 'mameya-three-pour') {
     // Observed cadence: three equal pours at the same slow flow, a fixed rest
@@ -152,9 +152,9 @@ function techniqueShape(technique, dose, water, source, intent = {}) {
     const interval = roundToFive(pourSeconds + source.restSeconds);
     const pullAt = interval * 2 + pourSeconds + source.pullAfterPourSeconds;
     return [
-      [0, first, `Pour ${first}g in the center over about ${pourSeconds} seconds, spout just above the coffee and a thin, slow stream. Do not stir or swirl.`, 'First pour'],
-      [interval, second, `Pour the same way to ${second}g total over about ${pourSeconds} seconds, center only.`, 'Second pour'],
-      [interval * 2, third, `Pour the last third in the center to ${third}g total over about ${pourSeconds} seconds, then leave it alone.`, 'Third pour'],
+      [0, first, `Pour ${first}g over about ${pourSeconds} seconds with the spout low, below the dripper rim, and a thin, slow stream (about ${round(flowGramsPerSecond)}g per second). Hold the stream in the center for the first 2 to 3 seconds, then pour small circles, about one per second and 2 to 3 cm wide, staying well off the paper. Do not stir or swirl.`, 'First pour'],
+      [interval, second, `Pour to ${second}g total over about ${pourSeconds} seconds: small circles the whole way at the same pace, about one per second, spout low and stream thin.`, 'Second pour'],
+      [interval * 2, third, `Pour the last third to ${third}g total over about ${pourSeconds} seconds: small circles for the first half (one spiral out and back), then hold the spout still in the center for the rest. Then leave it alone.`, 'Third pour'],
       [pullAt, third, `Finish: lift the dripper off the server by ${timeLabel(pullAt + 5)}, even though coffee is still on the bed. This keeps the thin, bitter last drips out of the cup.`, 'Lift the dripper'],
     ];
   }
@@ -193,9 +193,9 @@ function techniqueShape(technique, dose, water, source, intent = {}) {
     [60, round(water * 0.4), 'Pause until 1:10.', 'Rest'],
     [70, round(water * 0.6), `Pour in the same controlled spiral to ${round(water * 0.6)}g by 1:20.`, 'Pour 2'],
     [80, round(water * 0.6), 'Pause until 1:30.', 'Rest'],
-    [90, round(water * 0.8), `Pour to ${round(water * 0.8)}g by 1:40.`, 'Pour 3'],
+    [90, round(water * 0.8), `Pour in the same controlled spiral to ${round(water * 0.8)}g by 1:40.`, 'Pour 3'],
     [100, round(water * 0.8), 'Pause until 1:50.', 'Rest'],
-    [110, water, `Pour to ${water}g by 2:00.`, 'Final pour'],
+    [110, water, `Pour in the same controlled spiral to ${water}g by 2:00.`, 'Final pour'],
     [120, water, 'Give the brewer one gentle swirl to level the bed, then let it draw down.', 'Swirl & draw down'],
   ];
 }
@@ -212,7 +212,7 @@ function reasonForTechnique(technique, config) {
     case 'HIGH_ENERGY_LOW_FINES_PROFILE': return 'This coffee can handle more brewing energy, so two staged pours and controlled spins support an even extraction.';
     case 'CENTER_SPIRAL_PULSE_PROFILE': return 'This coffee suits small, controlled spiral pulses that balance clarity and sweetness.';
     case 'FULLER_CONTROLLED_PULSE_PROFILE': return 'This coffee benefits from controlled pulses that support body while keeping the pour repeatable.';
-    case 'MAMEYA_EARLY_PULL_PROFILE': return 'Koffee Mameya style: three gentle center pours with no stirring, and the dripper comes off early for a clean, light cup.';
+    case 'MAMEYA_EARLY_PULL_PROFILE': return 'Koffee Mameya style: three gentle spiral pours with no stirring, and the dripper comes off early for a clean, light cup.';
     case 'LOW_ENERGY_GENTLE_PROFILE': return 'This coffee suits a calm continuous pour that keeps the slurry stable and extraction even.';
     default: return 'This coffee suits a balanced small-dose pulse pattern for clarity, sweetness, and repeatability.';
   }

@@ -2,7 +2,7 @@ import { descriptorForMicrons, grinderSettingToMicrons, quantizeGrinderSetting, 
 import { V60_ICED_SOURCE_REGISTRY_VERSION, V60_ICED_RULES, V60_ICED_SOURCES, V60_ICED_TECHNIQUES, icedSourceById, isKnownV60IcedParameterSource } from '../data/v60IcedSourceRegistry.js';
 
 export const V60_ICED_ENGINE_VERSION = 'v60-iced-engine-v2';
-export const V60_ICED_RULES_VERSION = 'v60-iced-rules-v2';
+export const V60_ICED_RULES_VERSION = 'v60-iced-rules-v3-spiral-copy';
 export const V60_ICED_CONFIGURATION_KEY = 'v60:02:standard-paper:direct-server';
 export const V60_ICED_PHASE_CONTRACT_VERSION = 1;
 export const V60_ICED_SCALING_RULE_ID = 'v60-iced-dose-scaling-v1';
@@ -70,7 +70,7 @@ function buildSteps(technique, dose, hotWater, source) {
   if (technique.id === 'classic-60-40-flash') return [
     [0, bloom, `Bloom with ${bloom}g from the center; keep the stream on the bed and off the paper.`],
     [45, round(hotWater * 0.55), `Pour a controlled spiral to ${round(hotWater * 0.55)}g hot water; no aggressive agitation.`],
-    [120, hotWater, `Finish with a controlled center pour to ${hotWater}g hot water using a low stream; let it drain without a final swirl.`],
+    [120, hotWater, `Finish with the same controlled spiral to ${hotWater}g hot water using a low stream; let it drain without a final swirl.`],
   ];
   if (technique.id === 'kurasu-staged-flash' && source.id === 'kurasu-iced-staged-v1' && dose === source.doseGrams && Array.isArray(source.pourTargets)) return source.pourTargets.map((target, index) => [target.seconds, target.grams, index === 0
     ? `Bloom with ${target.grams}g in a small center circle; let the bed settle.`
@@ -84,12 +84,12 @@ function buildSteps(technique, dose, hotWater, source) {
   ];
   if (source?.id === 'partners-flash-6733-v1' && dose === source.doseGrams && Array.isArray(source.pourTargets)) return source.pourTargets.map((target, index) => [target.seconds, target.grams, index === 0
     ? `Bloom with ${target.grams}g water in the center; stir gently as directed by the source.`
-    : `Pour to ${target.grams}g hot water with a low centered pulse; keep the stream on the bed and away from paper.`]);
+    : `Pour to ${target.grams}g hot water with a low pulse in small circles from the center; keep the stream on the bed and away from paper.`]);
   const finalAction = source?.id === 'partners-flash-6733-v1'
-      ? `Finish with a low centered pulse to ${hotWater}g; keep the stream on the bed and away from paper. After drawdown give the gentle carafe swirl from the source.`
+      ? `Finish with a low pulse in small circles from the center to ${hotWater}g; keep the stream on the bed and away from paper. After drawdown give the gentle carafe swirl from the source.`
     : source?.id === 'counterculture-flash-v1'
       ? `Finish with a circular pulse to ${hotWater}g; keep the stream low and off paper; do not infer an agitation step the source does not specify.`
-      : `Finish with a low centered pulse to ${hotWater}g; keep the stream on the bed and away from paper; no final swirl.`;
+      : `Finish with a low pulse in small circles from the center to ${hotWater}g; keep the stream on the bed and away from paper; no final swirl.`;
   return [
     [0, bloom, `Bloom with ${bloom}g from the center; wet the bed evenly and do not swirl.`],
     [40, round(hotWater * 0.5), `Pulse in a restrained center-to-small-spiral pattern to ${round(hotWater * 0.5)}g; keep off paper.`],
