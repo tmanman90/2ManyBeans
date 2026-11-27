@@ -3,11 +3,12 @@ import { generateV60Recipe, generateV60RecipeForTechnique, validateV60Candidate 
 import { buildTimerSteps } from '../src/lib/brewTimerSteps.js';
 import { getV60TechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 
-// Observed Koffee Mameya V60 (2026-11-27): 12g/180g, three equal pours
-// at 0:00/0:35/1:10 (spirals), no agitation, dripper lifted off before drawdown ends.
+// Koffee Mameya V60 (2026-11-27): 12g/180g, three equal pours on the staff's
+// 30 s clock (0:00/0:30/1:00), small circles, no agitation, dripper lifted off
+// by 1:30 before drawdown ends.
 const exact = generateV60RecipeForTechnique('mameya-three-pour', {}, { dose: 12, grinder: 'fellow-ode-gen2' });
 assert.equal(validateV60Candidate(exact).valid, true, validateV60Candidate(exact).errors.join(', '));
-assert.deepEqual(exact.steps.map((step) => step.timeSeconds), [0, 35, 70, 85]);
+assert.deepEqual(exact.steps.map((step) => step.timeSeconds), [0, 30, 60, 85]);
 assert.deepEqual(exact.steps.map((step) => step.waterTotal), [60, 120, 180, 180]);
 assert.equal(exact.ratio, '1:15');
 assert.equal(exact.guideTargetSeconds, 90, 'the brew ends at the 1:30 pull, not at drawdown');
@@ -18,7 +19,7 @@ assert.match(exact.steps.at(-1).action, /lift the dripper off the server by 1:30
 // circles the whole way, pour 3 circles for the first half then holds still
 // in the center.
 assert.match(exact.steps[0].action, /about 6g per second/);
-assert.match(exact.steps[0].action, /center for the first 2 to 3 seconds.*small circles, about one per second and 2 to 3 cm wide/i);
+assert.match(exact.steps[0].action, /center for the first 2 to 3 seconds.*small circles, about one per second and about 3 cm across/i);
 assert.match(exact.steps[1].action, /small circles the whole way.*about one per second/i);
 assert.match(exact.steps[2].action, /small circles for the first half \(one spiral out and back\).*hold the spout still in the center/i);
 assert.ok(exact.steps.every((step) => !/\b(?:gently swirl|give .* swirl|stir once)\b/i.test(step.action)), 'no agitation steps');
@@ -35,7 +36,14 @@ assert.equal(exact.sourceLineage.parameterSources.temperature, 'v60-adaptation-b
 assert.equal(exact.sourceLineage.parameterSources.cadence, 'mameya-three-pour-observed-v1');
 assert.match(exact.sourceLineage.adaptation, /^Observed method: Koffee Mameya/);
 
-// Larger doses keep the slow pour and the rest between pours, and still pull early.
+// Staff numbers for 20g: 100g pours, done in 95 seconds.
+const twenty = generateV60RecipeForTechnique('mameya-three-pour', {}, { dose: 20 });
+assert.deepEqual(twenty.steps.map((step) => step.waterTotal), [100, 200, 300, 300]);
+assert.deepEqual(twenty.steps.map((step) => step.timeSeconds), [0, 30, 60, 90]);
+assert.equal(twenty.guideTargetSeconds, 95);
+assert.match(twenty.steps.at(-1).action, /by 1:35/);
+
+// Every dose keeps the 30 s clock, a slow pour with a real pause, and the early pull.
 for (const dose of [15, 20, 30]) {
   const recipe = generateV60RecipeForTechnique('mameya-three-pour', {}, { dose });
   assert.equal(validateV60Candidate(recipe).valid, true, `${dose}g: ${validateV60Candidate(recipe).errors.join(', ')}`);
@@ -43,12 +51,13 @@ for (const dose of [15, 20, 30]) {
   assert.ok(recipe.sourceLineage.changedFields.includes('cadence'));
   const [first, second, third, pull] = recipe.steps;
   assert.equal(third.waterTotal, recipe.waterGrams);
-  assert.ok(second.timeSeconds >= 35 && third.timeSeconds === second.timeSeconds * 2);
-  const pourSeconds = Math.round(first.waterTotal / 6);
-  assert.ok(second.timeSeconds - pourSeconds >= 20, `${dose}g keeps a real rest between pours`);
+  assert.equal(second.timeSeconds, 30);
+  assert.equal(third.timeSeconds, 60);
+  const pourSeconds = Number(first.action.match(/over about (\d+) seconds/)[1]);
+  assert.ok(second.timeSeconds - pourSeconds >= 5, `${dose}g leaves a pause between pours`);
+  assert.ok(recipe.guideTargetSeconds >= 90 && recipe.guideTargetSeconds <= 102, `${dose}g total stays near the staff's 90-95 s`);
   assert.equal(pull.waterTotal, recipe.waterGrams);
   assert.equal(recipe.guideTargetSeconds, pull.timeSeconds + 5);
-  assert.ok(recipe.guideTargetSeconds < 180, `${dose}g is still a short brew`);
   assert.ok(buildTimerSteps(recipe).length === 4);
 }
 

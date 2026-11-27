@@ -3,12 +3,15 @@ import { readFileSync } from 'node:fs';
 import { V60_SOURCES, V60_TECHNIQUES, validateV60Registry, V60_SOURCE_REGISTRY_VERSION } from '../src/data/v60SourceRegistry.js';
 const result = validateV60Registry();
 assert.equal(result.valid, true, result.errors.join(', '));
-assert.equal(V60_SOURCE_REGISTRY_VERSION, 'v60-hot-sources-v2');
+assert.equal(V60_SOURCE_REGISTRY_VERSION, 'v60-hot-sources-v3');
 assert.ok(Object.keys(V60_TECHNIQUES).length >= 6);
 assert.ok(V60_SOURCES.every((source) => source.evidenceType === 'primary' || (source.evidenceType === 'observed' && source.observedAt)));
 const mameya = V60_SOURCES.find((source) => source.id === 'mameya-three-pour-observed-v1');
 assert.equal(mameya.evidenceType, 'observed');
-assert.deepEqual(mameya.pourTargets, [{ seconds: 0, grams: 60 }, { seconds: 35, grams: 120 }, { seconds: 70, grams: 180 }]);
+// Staff timing (pours on a 30 s clock) wins over the ~35 s gaps seen on video,
+// where the barista was pouring other guests' brewers in between.
+assert.deepEqual(mameya.pourTargets, [{ seconds: 0, grams: 60 }, { seconds: 30, grams: 120 }, { seconds: 60, grams: 180 }]);
+assert.deepEqual(mameya.staffTotals.map((point) => [point.doseGrams, point.waterGrams, point.totalSeconds]), [[12, 180, 90], [20, 300, 95]]);
 assert.equal(mameya.doseGrams * mameya.ratio, 180);
 assert.deepEqual(mameya.assumedFields, ['temperature'], 'the kettle temperature is not from the observation');
 assert.match(readFileSync(new URL('../docs/data/mameya-v60-observation-2026-11-27.md', import.meta.url), 'utf8'), /lifts the dripper off/);
