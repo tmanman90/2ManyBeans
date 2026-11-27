@@ -3,7 +3,7 @@ import { buildTimerSteps } from './brewTimerSteps.js';
 import { V60_SOURCE_REGISTRY_VERSION, V60_RULES, V60_SOURCES, V60_TECHNIQUES, sourceById, isKnownV60ParameterSource } from '../data/v60SourceRegistry.js';
 
 export const V60_ENGINE_VERSION = 'v60-hot-engine-v3';
-export const V60_RULES_VERSION = 'v60-hot-rules-v6-mameya-90c';
+export const V60_RULES_VERSION = 'v60-hot-rules-v7-mameya-light-washed';
 export const V60_CONFIGURATION_KEY = 'v60:02:standard-paper';
 export const V60_PHASE_CONTRACT_VERSION = 1;
 export const V60_ADAPTATION_RULE_ID = 'v60-adaptation-bounded-v1';
@@ -63,6 +63,22 @@ function executableSourceRecipe(recipe) {
   return recipe.steps.at(-1).waterTotal === expectedWater && recipe.guideSeconds > lastTime ? recipe : null;
 }
 
+// The bean family Koffee Mameya brews on the V60: light, washed and delicate,
+// like the Alo Zero Washed (Ethiopia) Tal had there on 2026-11-27. The staff
+// said light roasts brew fast on the V60 while other coffees take about 4
+// minutes on a second brewer; Tal asked for "the ones like that", not every
+// light roast. So the bean needs a light roast (nothing with medium or dark),
+// a washed process (no natural, honey, anaerobic or co-ferment), and bean
+// research placing the cup in a delicate washed-clarity family.
+const MAMEYA_CUP_FAMILIES = new Set(['washed-ethiopia-clarity', 'washed-floral-clarity']);
+
+export function isMameyaV60Family(intent = {}) {
+  const priors = intentValue(intent, 'softPriors', {}) || {};
+  const roast = String(priors.roast || '').toLowerCase();
+  const lightRoast = /light/.test(roast) && !/medium|dark/.test(roast);
+  return lightRoast && priors.process === 'washed' && MAMEYA_CUP_FAMILIES.has(intentValue(intent, 'family', ''));
+}
+
 export function selectV60Technique(intent = {}, configuration = {}, evidence = null) {
   const config = normalizeV60Configuration(configuration);
   const structuredRecipes = sourceRecipesFor(evidence);
@@ -75,6 +91,7 @@ export function selectV60Technique(intent = {}, configuration = {}, evidence = n
   const cupDirection = intentValue(intent, 'cupDirection', {});
   if (config.dose >= 25) return { ...V60_TECHNIQUES.largeBatch, reasonCode: 'LARGE_DOSE_DEDICATED_PROFILE' };
   if (finesRisk === 'high') return { ...V60_TECHNIQUES.gentle, reasonCode: 'HIGH_FINES_LOW_AGITATION' };
+  if (isMameyaV60Family(intent)) return { ...V60_TECHNIQUES.mameya, reasonCode: 'LIGHT_WASHED_MAMEYA_PROFILE' };
   if (intentValue(intent, 'techniquePreference') === 'bloom-led-pulse') return { ...V60_TECHNIQUES.coarse46, reasonCode: 'COARSE_PULSE_SOLUBILITY_PROFILE' };
   if (energy === 'higher' && finesRisk !== 'high') return { ...V60_TECHNIQUES.twoStage, reasonCode: 'HIGH_ENERGY_LOW_FINES_PROFILE' };
   if (intentValue(intent, 'techniquePreference') === 'center-to-spiral-pulse') return { ...V60_TECHNIQUES.smallPulse, reasonCode: 'CENTER_SPIRAL_PULSE_PROFILE' };
@@ -216,6 +233,7 @@ function reasonForTechnique(technique, config) {
     case 'HIGH_ENERGY_LOW_FINES_PROFILE': return 'This coffee can handle more brewing energy, so two staged pours and controlled spins support an even extraction.';
     case 'CENTER_SPIRAL_PULSE_PROFILE': return 'This coffee suits small, controlled spiral pulses that balance clarity and sweetness.';
     case 'FULLER_CONTROLLED_PULSE_PROFILE': return 'This coffee benefits from controlled pulses that support body while keeping the pour repeatable.';
+    case 'LIGHT_WASHED_MAMEYA_PROFILE': return 'A delicate light washed coffee like this is what Koffee Mameya brews on the V60: three gentle spiral pours with no stirring, and the dripper comes off early for a clean, light cup.';
     case 'MAMEYA_EARLY_PULL_PROFILE': return 'Koffee Mameya style: three gentle spiral pours with no stirring, and the dripper comes off early for a clean, light cup.';
     case 'LOW_ENERGY_GENTLE_PROFILE': return 'This coffee suits a calm continuous pour that keeps the slurry stable and extraction even.';
     default: return 'This coffee suits a balanced small-dose pulse pattern for clarity, sweetness, and repeatability.';

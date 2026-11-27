@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { generateV60Recipe, generateV60RecipeForTechnique, validateV60Candidate } from '../src/lib/v60Adapter.js';
+import { generateV60Recipe, generateV60RecipeForTechnique, isMameyaV60Family, validateV60Candidate } from '../src/lib/v60Adapter.js';
+import { buildExtractionIntent } from '../src/lib/extractionIntent.js';
 import { buildTimerSteps } from '../src/lib/brewTimerSteps.js';
 import { getV60TechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 
@@ -64,12 +65,59 @@ for (const dose of [15, 20, 30]) {
   assert.ok(buildTimerSteps(recipe).length === 4);
 }
 
-// Explicit choice only: the automatic selector never lands on it.
+// Abstract intents with no light washed bean behind them never land on it.
 const intents = [{}, { finesRisk: 'high' }, { finesRisk: 'low', energyTendency: 'higher' }, { energyTendency: 'lower' },
   { techniquePreference: 'bloom-led-pulse' }, { techniquePreference: 'low-agitation-center' }, { desiredStrength: 'stronger' }];
 for (const intent of intents) {
   for (const dose of [12, 15, 20, 30]) assert.notEqual(generateV60Recipe(intent, { dose }).technique, 'mameya-three-pour');
 }
+
+// The bean family (2026-11-27): light, washed and delicate like the Alo Zero
+// Washed gets Mameya automatically. Tal: not every light roast, "the ones like that".
+const technique = (bean, research = null, dose = 15) => generateV60Recipe(buildExtractionIntent(bean, research), { dose }).technique;
+const alo = { name: 'Alo Zero Washed', origin: 'Ethiopia', process: 'Washed', roastLevel: 'light' };
+for (const dose of [12, 15, 20, 24]) {
+  const recipe = generateV60Recipe(buildExtractionIntent(alo, { cupStructureFamily: 'washed-ethiopia-clarity' }), { dose });
+  assert.equal(recipe.technique, 'mameya-three-pour', `Alo-like bean at ${dose}g`);
+  assert.equal(recipe.waterTemp.celsius, 90);
+  assert.equal(recipe.waterGrams, Math.round(dose * 15));
+  assert.match(recipe.reasoning, /delicate light washed coffee like this is what Koffee Mameya brews/);
+}
+const aloResearch = { cupStructureFamily: 'washed-ethiopia-clarity' };
+assert.equal(technique({ ...alo, roastLevel: 'Ultra-Light' }, aloResearch), 'mameya-three-pour');
+assert.equal(technique({ ...alo, origin: 'Colombia', variety: 'Gesha' }, { cupStructureFamily: 'washed-floral-clarity' }), 'mameya-three-pour');
+assert.equal(isMameyaV60Family(buildExtractionIntent(alo, aloResearch)), true);
+
+// Outside the family: naturals and other fruit-forward processes, anything with
+// medium or dark in the roast, unknown roast, heavier cup families, big doses,
+// and beans with explicit flow-risk guidance keep their usual recipes.
+const tresDragones = { name: 'Tres Dragones', origin: 'Colombia', process: 'Natural', roastLevel: 'light' };
+const outside = [
+  [tresDragones, { cupStructureFamily: 'clean-natural-fruit' }],
+  [{ ...alo, process: 'Natural' }, aloResearch],
+  [{ ...alo, process: 'Honey' }, aloResearch],
+  [{ ...alo, process: 'Washed Anaerobic' }, aloResearch],
+  [alo, { ...aloResearch, processingNuance: 'co-fermented with fruit' }],
+  [{ ...alo, roastLevel: 'medium' }, aloResearch],
+  [{ ...alo, roastLevel: 'light-medium' }, aloResearch],
+  [{ ...alo, roastLevel: 'medium-light' }, aloResearch],
+  [{ ...alo, roastLevel: 'dark' }, aloResearch],
+  [{ ...alo, roastLevel: '' }, aloResearch],
+  // Not every light washed coffee: other cup families keep their recipes.
+  [{ ...alo, origin: 'Kenya' }, { cupStructureFamily: 'washed-kenya-clarity' }],
+  [{ ...alo, origin: 'Colombia' }, { cupStructureFamily: 'generic-washed' }],
+  [alo, { cupStructureFamily: 'processed-clarity' }],
+  [alo, { cupStructureFamily: 'medium-washed' }],
+  [alo, null], // no bean research yet, so no cup family to go on
+  [{ ...alo, brewingRec: 'This coffee can stall; watch for slow drawdown.' }, aloResearch],
+];
+for (const [bean, research] of outside) {
+  assert.notEqual(technique(bean, research), 'mameya-three-pour', JSON.stringify({ bean, research }));
+}
+assert.equal(technique(alo, aloResearch, 25), 'hoffmann-large-batch', '25g+ keeps the large-batch profile');
+// A roaster's own complete V60 recipe still wins over the family rule.
+const roasterRecipe = { id: 'roaster-v60', mode: 'hot', device: 'v60', configuration: 'V60 02', status: 'original', canonicalUrl: 'https://roaster.example/v60', doseGrams: 15, ratio: 16, temperatureC: 94, grind: 'medium', geometry: 'center spiral', cadence: '45s', agitation: 'low', guideSeconds: 180, steps: [{ timeSeconds: 0, waterTotal: 45, action: 'Bloom with a small spiral.' }, { timeSeconds: 45, waterTotal: 240, action: 'Pour a center spiral.' }] };
+assert.equal(generateV60Recipe(buildExtractionIntent(alo, aloResearch), { dose: 15 }, { sourceInsights: { brewRecipes: [roasterRecipe] } }).technique, 'direct-roaster-v60');
 
 // Other families keep their drawdown-based finish.
 const hoffmann = generateV60RecipeForTechnique('hoffmann-small-pulses', {}, { dose: 15 });
