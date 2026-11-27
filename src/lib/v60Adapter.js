@@ -3,7 +3,7 @@ import { buildTimerSteps } from './brewTimerSteps.js';
 import { V60_SOURCE_REGISTRY_VERSION, V60_RULES, V60_SOURCES, V60_TECHNIQUES, sourceById, isKnownV60ParameterSource } from '../data/v60SourceRegistry.js';
 
 export const V60_ENGINE_VERSION = 'v60-hot-engine-v3';
-export const V60_RULES_VERSION = 'v60-hot-rules-v4-spiral-copy';
+export const V60_RULES_VERSION = 'v60-hot-rules-v5-mameya-house-timing';
 export const V60_CONFIGURATION_KEY = 'v60:02:standard-paper';
 export const V60_PHASE_CONTRACT_VERSION = 1;
 export const V60_ADAPTATION_RULE_ID = 'v60-adaptation-bounded-v1';
@@ -143,16 +143,19 @@ function techniqueShape(technique, dose, water, source, intent = {}) {
     [160, water, `Pour the final pulse to ${water}g total in the same small circles, then let it drain without swirling.`, 'Final pour'],
   ];
   if (technique.id === 'mameya-three-pour') {
-    // Observed cadence: three equal pours at the same slow flow, a fixed rest
-    // between them, and the dripper lifted off a few seconds after the last
-    // pour. Larger doses keep the flow and rest, so the pours simply last longer.
+    // House timing from the Mameya staff: three equal pours on a 30 s clock,
+    // and the brew is over (dripper off) at 90 s for 12g and 95 s for 20g.
+    // Other doses interpolate those two totals. The slow observed flow
+    // (about 6 g/s) sets how long each pour lasts, capped inside the 30 s.
     const [first, second, third] = [round(water / 3), round((water * 2) / 3), water];
     const flowGramsPerSecond = source.pourTargets[0].grams / source.pourSeconds;
-    const pourSeconds = Math.max(source.pourSeconds, round(first / flowGramsPerSecond));
-    const interval = roundToFive(pourSeconds + source.restSeconds);
-    const pullAt = interval * 2 + pourSeconds + source.pullAfterPourSeconds;
+    const interval = source.intervalSeconds;
+    const pourSeconds = Math.min(interval - 5, Math.max(source.pourSeconds, round(first / flowGramsPerSecond)));
+    const [small, large] = source.staffTotals;
+    const totalSeconds = round(small.totalSeconds + ((dose - small.doseGrams) * (large.totalSeconds - small.totalSeconds)) / (large.doseGrams - small.doseGrams));
+    const pullAt = totalSeconds - 5;
     return [
-      [0, first, `Pour ${first}g over about ${pourSeconds} seconds with the spout low, below the dripper rim, and a thin, slow stream (about ${round(flowGramsPerSecond)}g per second). Hold the stream in the center for the first 2 to 3 seconds, then pour small circles, about one per second and 2 to 3 cm wide, staying well off the paper. Do not stir or swirl.`, 'First pour'],
+      [0, first, `Pour ${first}g over about ${pourSeconds} seconds with the spout low, below the dripper rim, and a thin, slow stream (about ${round(flowGramsPerSecond)}g per second). Hold the stream in the center for the first 2 to 3 seconds, then pour small circles, about one per second and about 3 cm across, staying well off the paper. Do not stir or swirl.`, 'First pour'],
       [interval, second, `Pour to ${second}g total over about ${pourSeconds} seconds: small circles the whole way at the same pace, about one per second, spout low and stream thin.`, 'Second pour'],
       [interval * 2, third, `Pour the last third to ${third}g total over about ${pourSeconds} seconds: small circles for the first half (one spiral out and back), then hold the spout still in the center for the rest. Then leave it alone.`, 'Third pour'],
       [pullAt, third, `Finish: lift the dripper off the server by ${timeLabel(pullAt + 5)}, even though coffee is still on the bed. This keeps the thin, bitter last drips out of the cup.`, 'Lift the dripper'],
