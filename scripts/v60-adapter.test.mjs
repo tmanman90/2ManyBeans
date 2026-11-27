@@ -26,8 +26,10 @@ assert.equal(fallback.fallbackReason, 'malformed-evidence');
 const intent = buildExtractionIntent({ process: 'washed', roastLevel: 'light' });
 assert.equal(generateV60Recipe(intent, { dose: 15 }).device, 'v60');
 
+// light-medium keeps this bean outside the Mameya family (light washed), so it
+// still checks that a center-to-spiral hint wins over a 95C low-energy hint.
 const floralLowTemperature = buildExtractionIntent(
-  { process: 'washed', roastLevel: 'light', brewingRec: 'Use a center-to-spiral pour at 95C.' },
+  { process: 'washed', roastLevel: 'light-medium', brewingRec: 'Use a center-to-spiral pour at 95C.' },
   { cupStructureFamily: 'washed-floral-clarity', densityEstimate: 'high' },
 );
 assert.equal(generateV60Recipe(floralLowTemperature, { dose: 15 }).technique, 'hoffmann-small-pulses');

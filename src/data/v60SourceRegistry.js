@@ -84,7 +84,8 @@ export const V60_TECHNIQUES = Object.freeze({
   twoStage: { id: 'rao-two-stage', sourceIds: ['rao-two-stage-v1'], label: 'high-energy two-stage brewing' },
   gentle: { id: 'gentle-main-pour', sourceIds: ['heart-continuous-v1'], label: 'gentle continuous main pour' },
   controlled: { id: 'kurasu-controlled-pulses', sourceIds: ['kurasu-controlled-pulses-v1'], label: 'controlled low-radius pulses' },
-  // Explicit-choice only: the automatic selector never picks it.
+  // Picked automatically for light washed Alo-like beans (isMameyaV60Family in
+  // src/lib/v60Adapter.js) and on request for any bean.
   mameya: { id: 'mameya-three-pour', sourceIds: ['mameya-three-pour-observed-v1'], label: 'three gentle spiral pours with an early pull' },
 });
 
