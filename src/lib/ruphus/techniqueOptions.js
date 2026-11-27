@@ -88,7 +88,7 @@ const DIFFERENCES = Object.freeze({
   'mameya-three-pour-observed-v1': [
     'Observed at Koffee Mameya, Tokyo (2026-11-27), not a published recipe: three equal pours of small circles every 30 seconds, 12g to 180g, done at 1:30 (20g: 100g pours, done at 1:35, per the staff); the last pour is one spiral then the center.',
     'Spout held low with a thin stream, no stir or swirl, and the dripper is lifted off at about 1:30 before it finishes draining.',
-    'Kettle temperature was not visible, so 92C is an app choice.',
+    'Water at 90C, the house temperature.',
   ],
 });
 
