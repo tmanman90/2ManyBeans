@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { generateV60Recipe } from '../src/lib/v60Adapter.js';
+import { generateV60Recipe, generateV60RecipeForTechnique } from '../src/lib/v60Adapter.js';
 const large = generateV60Recipe({}, { dose: 30 });
 assert.match(large.steps[0].action, /60g/);
 assert.match(large.steps[1].action, /300g/);
@@ -34,4 +34,18 @@ for (const recipe of [oneCup, large, rao, heart, heartScaled, adapted, kasuya]) 
   assert.ok(recipe.steps.every((step) => step.name && step.action));
   assert.doesNotMatch(`${recipe.reasoning} ${recipe.steps.map((step) => step.action).join(' ')}`, /available extraction evidence|source bloom energy|source's final stir|bounded high-fines|small 12 18/i);
 }
+// Pour path is its own lever: every hot V60 pour names circles or a spiral,
+// except Heart's published slow center pour (2026-11-27, after Tal saw
+// Mameya spiral every pour and found the app's pours center-only).
+const pathRecipes = [rao, adapted];
+for (const technique of ['hoffmann-small-pulses', 'hoffmann-large-batch', 'kasuya-coarse-pulses', 'mameya-three-pour']) {
+  for (const dose of [12, 15, 20, 30]) pathRecipes.push(generateV60RecipeForTechnique(technique, {}, { dose }));
+}
+for (const recipe of pathRecipes) {
+  for (const step of recipe.steps.filter((candidate) => /^Pour\b/.test(candidate.action))) {
+    assert.match(step.action, /spiral|circle/i, `${recipe.technique} ${recipe.coffeeGrams}g: ${step.action}`);
+  }
+}
+const kasuyaCopy = generateV60Recipe({ techniquePreference: 'bloom-led-pulse' }, { dose: 18 });
+assert.ok(kasuyaCopy.steps.every((step) => /circles/i.test(step.action)), 'Kasuya pulses keep the restrained spiral the registry names');
 console.log('v60 technique copy/provenance passed (large, Rao, Heart, incomplete Kurasu adaptation)');

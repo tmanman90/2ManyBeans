@@ -21,7 +21,7 @@ export const V60_SWITCH_ENGINE_VERSION = 'v60-switch-engine-v1';
 // single-temp + bean-driven-valve-timing rules on next read (R8).
 // v3 (2026-11-22) adds the timed closed-valve steep step after pour 2, so
 // cached v2 recipes (no steep step) regenerate on next read.
-export const V60_SWITCH_RULES_VERSION = 'v60-switch-rules-v3-timed-steep';
+export const V60_SWITCH_RULES_VERSION = 'v60-switch-rules-v4-spiral-copy';
 export const V60_SWITCH_PHASE_CONTRACT_VERSION = 1;
 
 const GRINDER_RANGES = {
@@ -267,7 +267,7 @@ export function generateV60SwitchRecipe(intent = {}, configuration = {}) {
     steps.push({ time: '0:00', timeSeconds: 0, name: 'Closed bloom', action: `Close the valve and bloom with ${bloomGrams}g water.`, waterTotal: bloomGrams, phase: 'immersion' });
     steps.push({
       time: timeLabel(timeOffset), timeSeconds: timeOffset, name: 'Open pour',
-      action: `Open the valve. Pour to ${phase1WaterGrams}g in a steady center pour.`, waterTotal: phase1WaterGrams, phase: 'percolation',
+      action: `Open the valve. Pour to ${phase1WaterGrams}g in slow, steady circles from the center, keeping the stream off the paper.`, waterTotal: phase1WaterGrams, phase: 'percolation',
     });
   } else {
     steps.push({ time: '0:00', timeSeconds: 0, name: 'Open pour', action: `Pour to ${phase1WaterGrams}g with the valve open.`, waterTotal: phase1WaterGrams, phase: 'percolation' });

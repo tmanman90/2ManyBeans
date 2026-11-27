@@ -3,8 +3,8 @@ import { generateV60Recipe, generateV60RecipeForTechnique, validateV60Candidate 
 import { buildTimerSteps } from '../src/lib/brewTimerSteps.js';
 import { getV60TechniqueOption } from '../src/lib/ruphus/techniqueOptions.js';
 
-// Observed Koffee Mameya V60 (2026-11-27): 12g/180g, three equal center pours
-// at 0:00/0:35/1:10, no agitation, dripper lifted off before drawdown ends.
+// Observed Koffee Mameya V60 (2026-11-27): 12g/180g, three equal pours
+// at 0:00/0:35/1:10 (spirals), no agitation, dripper lifted off before drawdown ends.
 const exact = generateV60RecipeForTechnique('mameya-three-pour', {}, { dose: 12, grinder: 'fellow-ode-gen2' });
 assert.equal(validateV60Candidate(exact).valid, true, validateV60Candidate(exact).errors.join(', '));
 assert.deepEqual(exact.steps.map((step) => step.timeSeconds), [0, 35, 70, 85]);
@@ -13,7 +13,14 @@ assert.equal(exact.ratio, '1:15');
 assert.equal(exact.guideTargetSeconds, 90, 'the brew ends at the 1:30 pull, not at drawdown');
 assert.deepEqual(exact.guideRangeSeconds, [85, 95]);
 assert.match(exact.steps.at(-1).action, /lift the dripper off the server by 1:30/i);
-assert.ok(exact.steps.slice(0, 3).every((step) => /center/i.test(step.action)));
+// Pour path from the video (frame tracking of the kettle neck): pour 1 holds
+// the center 2-3 s then small circles about once a second, pour 2 is small
+// circles the whole way, pour 3 circles for the first half then holds still
+// in the center.
+assert.match(exact.steps[0].action, /about 6g per second/);
+assert.match(exact.steps[0].action, /center for the first 2 to 3 seconds.*small circles, about one per second and 2 to 3 cm wide/i);
+assert.match(exact.steps[1].action, /small circles the whole way.*about one per second/i);
+assert.match(exact.steps[2].action, /small circles for the first half \(one spiral out and back\).*hold the spout still in the center/i);
 assert.ok(exact.steps.every((step) => !/\b(?:gently swirl|give .* swirl|stir once)\b/i.test(step.action)), 'no agitation steps');
 assert.doesNotMatch(exact.tips, /occasional drips/i, 'early-pull tips must not say to wait for drawdown');
 assert.equal(exact.grindSize.microns, 836);
