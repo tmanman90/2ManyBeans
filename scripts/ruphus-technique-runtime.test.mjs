@@ -124,7 +124,7 @@ test('technique reader returns executable alternatives and preserves another-sel
   assert.equal(first.ok, true);
   assert.equal(first.actionable, true);
   assert.equal(first.current.sourceLineage.sourceIds[0], 'hoffmann-one-cup-v1');
-  assert.equal(first.options.length, 3);
+  assert.equal(first.options.length, 4);
   assert.ok(first.options.every((option) => option.executable && option.timerReady));
   assert.ok(first.options.every((option) => option.familyId !== recipe.technique));
   assert.ok(!first.options.some((option) => ['rao-two-stage-v1', 'kurasu-controlled-pulses-v1'].includes(option.sourceId)));

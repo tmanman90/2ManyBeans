@@ -23,6 +23,7 @@ assert.deepEqual(all.map((option) => option.sourceId), [
   'hoffmann-large-batch-v1',
   'kasuya-46-v1',
   'heart-continuous-v1',
+  'mameya-three-pour-observed-v1',
 ]);
 assert.ok(all.every((option) => option.timerReady && option.executable));
 assert.ok(all.every((option) => option.sourceId && option.familyId && option.attribution?.canonicalUrl));
