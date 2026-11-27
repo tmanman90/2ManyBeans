@@ -28,11 +28,13 @@ assert.equal(exact.grindSize.microns, 836);
 assert.equal(exact.grindSize.setting, '7.2');
 assert.ok(buildTimerSteps(exact).length === 4);
 
-// The kettle temperature was not visible: 92C is an app value, never credited to the source.
-assert.equal(exact.waterTemp.celsius, 92);
-assert.equal(exact.sourceLineage.status, 'adapted');
-assert.ok(exact.sourceLineage.changedFields.includes('temperature'));
-assert.equal(exact.sourceLineage.parameterSources.temperature, 'v60-adaptation-bounded-v1');
+// 90C is the house temperature and is part of the method: a bean's usual
+// temperature does not override it.
+assert.equal(exact.waterTemp.celsius, 90);
+assert.equal(generateV60RecipeForTechnique('mameya-three-pour', { targetTemperatureC: 96 }, { dose: 12 }).waterTemp.celsius, 90);
+assert.equal(exact.sourceLineage.status, 'original', 'the 12g recipe is the house recipe as given');
+assert.ok(!exact.sourceLineage.changedFields.includes('temperature'));
+assert.equal(exact.sourceLineage.parameterSources.temperature, 'mameya-three-pour-observed-v1');
 assert.equal(exact.sourceLineage.parameterSources.cadence, 'mameya-three-pour-observed-v1');
 assert.match(exact.sourceLineage.adaptation, /^Observed method: Koffee Mameya/);
 
@@ -47,7 +49,8 @@ assert.match(twenty.steps.at(-1).action, /by 1:35/);
 for (const dose of [15, 20, 30]) {
   const recipe = generateV60RecipeForTechnique('mameya-three-pour', {}, { dose });
   assert.equal(validateV60Candidate(recipe).valid, true, `${dose}g: ${validateV60Candidate(recipe).errors.join(', ')}`);
-  assert.equal(recipe.sourceLineage.status, 'adapted');
+  assert.equal(recipe.sourceLineage.status, 'scaled');
+  assert.equal(recipe.waterTemp.celsius, 90);
   assert.ok(recipe.sourceLineage.changedFields.includes('cadence'));
   const [first, second, third, pull] = recipe.steps;
   assert.equal(third.waterTotal, recipe.waterGrams);

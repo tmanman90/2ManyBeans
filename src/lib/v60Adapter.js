@@ -3,7 +3,7 @@ import { buildTimerSteps } from './brewTimerSteps.js';
 import { V60_SOURCE_REGISTRY_VERSION, V60_RULES, V60_SOURCES, V60_TECHNIQUES, sourceById, isKnownV60ParameterSource } from '../data/v60SourceRegistry.js';
 
 export const V60_ENGINE_VERSION = 'v60-hot-engine-v3';
-export const V60_RULES_VERSION = 'v60-hot-rules-v5-mameya-house-timing';
+export const V60_RULES_VERSION = 'v60-hot-rules-v6-mameya-90c';
 export const V60_CONFIGURATION_KEY = 'v60:02:standard-paper';
 export const V60_PHASE_CONTRACT_VERSION = 1;
 export const V60_ADAPTATION_RULE_ID = 'v60-adaptation-bounded-v1';
@@ -11,7 +11,8 @@ export const V60_SCALING_RULE_ID = 'v60-dose-scaling-v1';
 export const V60_REVIEWED_RATIO_BOUNDS = Object.freeze([...(V60_RULES[V60_ADAPTATION_RULE_ID]?.bounds?.ratio || [15, 18.5])]);
 export const V60_EXPLICIT_RATIO_RULE_ID = 'v60-explicit-ratio-adaptation-v1';
 export const V60_EXPLICIT_RATIO_BOUNDS = Object.freeze([...(V60_RULES[V60_EXPLICIT_RATIO_RULE_ID]?.bounds?.ratio || [10, 25])]);
-export const V60_REVIEWED_TEMPERATURE_BOUNDS = Object.freeze([92, 100]);
+// 90C is allowed because Koffee Mameya's house V60 runs at 90C.
+export const V60_REVIEWED_TEMPERATURE_BOUNDS = Object.freeze([90, 100]);
 const MIN_DOSE = 12;
 const MAX_DOSE = 30;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -242,7 +243,11 @@ function buildRecipe(intent, config, technique, { fallback = false, preserveInte
   const waterGrams = round(config.dose * ratio);
   const requestedTemperatureValue = intentValue(intent, 'targetTemperatureC', null);
   const requestedTemperature = requestedTemperatureValue == null ? null : Number(requestedTemperatureValue);
-  const temperature = technique.sourceRecipe && !preserveIntentOverrides
+  // A method with a fixed house temperature (Mameya, 90C) keeps it whatever
+  // temperature the bean's research suggests.
+  const temperature = source.fixedTemperature === true && Number.isFinite(source.temperatureC)
+    ? clamp(source.temperatureC, V60_REVIEWED_TEMPERATURE_BOUNDS[0], 100)
+    : technique.sourceRecipe && !preserveIntentOverrides
     ? clamp(source.temperatureC, 92, 100)
     : clamp(preserveIntentOverrides && Number.isFinite(requestedTemperature)
       ? requestedTemperature
@@ -337,7 +342,7 @@ export function validateV60Candidate(recipe) {
   if (recipe?.configurationKey !== V60_CONFIGURATION_KEY || recipe?.v60Size !== '02') errors.push('invalid-configuration');
   if (!Number.isFinite(recipe?.coffeeGrams) || recipe.coffeeGrams < MIN_DOSE || recipe.coffeeGrams > MAX_DOSE) errors.push('invalid-dose');
   if (!Number.isFinite(recipe?.waterGrams) || recipe.waterGrams <= 0 || !Number.isFinite(recipe?.waterTemp?.celsius)
-    || recipe.waterTemp.celsius < 92 || recipe.waterTemp.celsius > 100) errors.push('invalid-physical-values');
+    || recipe.waterTemp.celsius < V60_REVIEWED_TEMPERATURE_BOUNDS[0] || recipe.waterTemp.celsius > 100) errors.push('invalid-physical-values');
   if (!recipe?.sourceLineage?.sourceRegistryVersion || !recipe?.sourceLineage?.parameterSources) errors.push('missing-provenance');
   for (const [field, sourceId] of Object.entries(recipe?.sourceLineage?.parameterSources || {})) {
     const structuredAllowed = recipe?.sourceLineage?.structuredSource === true && recipe.sourceLineage.canonicalUrls?.every((url) => url && !/reddit\.com/i.test(url));

@@ -1,7 +1,7 @@
 // Machine-readable, human-audited hot V60 02 source registry.
 // Numeric fields are starting evidence, not universal guarantees. Adapters
 // record when a source recipe is scaled or bounded for the app.
-export const V60_SOURCE_REGISTRY_VERSION = 'v60-hot-sources-v3';
+export const V60_SOURCE_REGISTRY_VERSION = 'v60-hot-sources-v4';
 export const V60_RULES = Object.freeze({
   'v60-adaptation-bounded-v1': { allowedFields: ['brewer', 'dose', 'ratio', 'temperature', 'grind', 'geometry', 'cadence', 'agitation', 'water', 'bloom', 'guide'], bounds: { dose: [12, 30], ratio: [15, 18.5] }, sourceIds: ['hoffmann-one-cup-v1', 'hoffmann-large-batch-v1', 'kasuya-46-v1', 'rao-two-stage-v1', 'heart-continuous-v1', 'kurasu-controlled-pulses-v1', 'mameya-three-pour-observed-v1'] },
   // Separate app-authored envelope for an explicit ratio preview experiment;
@@ -63,11 +63,13 @@ export const V60_SOURCES = Object.freeze([
     // Observed in person, not a published recipe: Tal filmed two Koffee Mameya
     // (Tokyo) omakase brews on 2026-11-27, and the staff told him the house
     // timing (pours on a 30 s clock; 12g brews in 90 s, 20g in 95 s with 100g
-    // pours). Audit notes: docs/data/v60-source-registry.md.
+    // pours, water at 90C). Audit notes: docs/data/v60-source-registry.md.
     id: 'mameya-three-pour-observed-v1', author: 'Koffee Mameya, Tokyo',
     canonicalUrl: 'https://koffee-mameya.com/', publication: 'omakase V60 (observed in person 2026-11-27)',
     evidenceType: 'observed', observedAt: '2026-11-27', status: 'original', brewer: 'V60 02', doseGrams: 12,
-    ratio: 15, temperatureC: 92, assumedFields: ['temperature'], grind: 'medium-coarse (about 850 microns, estimated from a photo)',
+    // 90C is the house water temperature (Tal, 2026-11-27). It is part of the
+    // method, so the bean's usual temperature does not override it.
+    ratio: 15, temperatureC: 90, fixedTemperature: true, grind: 'medium-coarse (about 850 microns, estimated from a photo)',
     guideSeconds: 90, guideRangeSeconds: [85, 95], earlyPull: true,
     pourTargets: [{ seconds: 0, grams: 60 }, { seconds: 30, grams: 120 }, { seconds: 60, grams: 180 }], pourSeconds: 10, intervalSeconds: 30,
     staffTotals: [{ doseGrams: 12, waterGrams: 180, totalSeconds: 90 }, { doseGrams: 20, waterGrams: 300, totalSeconds: 95 }],

@@ -8,6 +8,8 @@ Tal asked the staff after the brews. The house V60 is 12g coffee to 180g water w
 
 The videos show the second and third pours starting about 34 to 36 seconds in, not 30. In both videos the barista was pouring other brewers between our pours, so the staff's clock is taken as the recipe and the video gaps as service lag. The pull time (about 1:30) matches the staff's total.
 
+Water temperature is 90C (Tal, after the brew). The app keeps 90C for this method whatever the bean's usual temperature is.
+
 The staff also said they like the V60 for light roasts right now because they brew fast, while other coffees take about 4 minutes on a second brewer (Tal thinks that one was Tres Dragones Natural, Colombia, not confirmed).
 
 ## First video (first bean)
@@ -71,7 +73,6 @@ Alo Zero Washed (second photo, held over the menu): a much lighter roast color w
 
 ## Not verified
 
-- Kettle temperature (the app uses 92C and marks it as an app value).
 - The dose for the Alo brew, and the second brewer's make, dose and timing.
 - Exact pour weights and the cup's final weight.
 - The audio was not transcribed, so anything the barista said is not captured.

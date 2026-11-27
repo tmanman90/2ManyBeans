@@ -168,7 +168,7 @@ assert.throws(() => generateV60TechniqueOption('made-up-source-v1', {}, { dose: 
 assert.throws(() => generateV60TechniqueOption('kasuya-46-v1', {}, { dose: 31 }), /between 12g and 30g/);
 assert.throws(() => generateV60TechniqueOption('kasuya-46-v1', {}, { brewer: 'Aiden', dose: 20 }), /hot V60 brewer/);
 assert.throws(() => generateV60RecipeForTechnique('kasuya-46-v1', { targetRatio: 19 }, { dose: 20 }), /reviewed ratio must be between 15 and 18.5/);
-assert.throws(() => generateV60RecipeForTechnique('kasuya-46-v1', { targetTemperatureC: 101 }, { dose: 20 }), /reviewed temperature must be between 92C and 100C/);
+assert.throws(() => generateV60RecipeForTechnique('kasuya-46-v1', { targetTemperatureC: 101 }, { dose: 20 }), /reviewed temperature must be between 90C and 100C/);
 
 const refs = listV60TechniqueReferences();
 assert.equal(refs.find((source) => source.sourceId === 'rao-two-stage-v1').timerReady, false);
