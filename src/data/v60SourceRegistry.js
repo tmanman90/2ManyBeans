@@ -3,11 +3,11 @@
 // record when a source recipe is scaled or bounded for the app.
 export const V60_SOURCE_REGISTRY_VERSION = 'v60-hot-sources-v2';
 export const V60_RULES = Object.freeze({
-  'v60-adaptation-bounded-v1': { allowedFields: ['brewer', 'dose', 'ratio', 'temperature', 'grind', 'geometry', 'cadence', 'agitation', 'water', 'bloom', 'guide'], bounds: { dose: [12, 30], ratio: [15, 18.5] }, sourceIds: ['hoffmann-one-cup-v1', 'hoffmann-large-batch-v1', 'kasuya-46-v1', 'rao-two-stage-v1', 'heart-continuous-v1', 'kurasu-controlled-pulses-v1'] },
+  'v60-adaptation-bounded-v1': { allowedFields: ['brewer', 'dose', 'ratio', 'temperature', 'grind', 'geometry', 'cadence', 'agitation', 'water', 'bloom', 'guide'], bounds: { dose: [12, 30], ratio: [15, 18.5] }, sourceIds: ['hoffmann-one-cup-v1', 'hoffmann-large-batch-v1', 'kasuya-46-v1', 'rao-two-stage-v1', 'heart-continuous-v1', 'kurasu-controlled-pulses-v1', 'mameya-three-pour-observed-v1'] },
   // Separate app-authored envelope for an explicit ratio preview experiment;
   // normal technique generation remains bounded by the rule above.
-  'v60-explicit-ratio-adaptation-v1': { allowedFields: ['ratio', 'water', 'bloom'], bounds: { ratio: [10, 25] }, sourceIds: ['hoffmann-one-cup-v1', 'hoffmann-large-batch-v1', 'kasuya-46-v1', 'rao-two-stage-v1', 'heart-continuous-v1', 'kurasu-controlled-pulses-v1'] },
-  'v60-dose-scaling-v1': { allowedFields: ['dose', 'water', 'bloom', 'cadence', 'guide'], bounds: { dose: [12, 30] }, sourceIds: ['hoffmann-one-cup-v1', 'hoffmann-large-batch-v1', 'kasuya-46-v1', 'rao-two-stage-v1', 'heart-continuous-v1'] },
+  'v60-explicit-ratio-adaptation-v1': { allowedFields: ['ratio', 'water', 'bloom'], bounds: { ratio: [10, 25] }, sourceIds: ['hoffmann-one-cup-v1', 'hoffmann-large-batch-v1', 'kasuya-46-v1', 'rao-two-stage-v1', 'heart-continuous-v1', 'kurasu-controlled-pulses-v1', 'mameya-three-pour-observed-v1'] },
+  'v60-dose-scaling-v1': { allowedFields: ['dose', 'water', 'bloom', 'cadence', 'guide'], bounds: { dose: [12, 30] }, sourceIds: ['hoffmann-one-cup-v1', 'hoffmann-large-batch-v1', 'kasuya-46-v1', 'rao-two-stage-v1', 'heart-continuous-v1', 'mameya-three-pour-observed-v1'] },
   'user-configuration': { allowedFields: ['dose', 'grinder'] },
 });
 
@@ -59,6 +59,17 @@ export const V60_SOURCES = Object.freeze([
     ratio: null, temperatureC: null, grind: null, guideSeconds: 150,
     geometry: 'first and final spoon agitation', agitation: 'spoon agitation', changedFields: ['brewer', 'dose', 'ratio', 'temperature', 'grind', 'cadence'],
   },
+  {
+    // Observed in person, not a published recipe: Tal filmed a Koffee Mameya
+    // (Tokyo) omakase brew on 2026-11-27. Audit notes: docs/data/v60-source-registry.md.
+    id: 'mameya-three-pour-observed-v1', author: 'Koffee Mameya, Tokyo',
+    canonicalUrl: 'https://koffee-mameya.com/', publication: 'omakase V60 (observed in person 2026-11-27)',
+    evidenceType: 'observed', observedAt: '2026-11-27', status: 'original', brewer: 'V60 02', doseGrams: 12,
+    ratio: 15, temperatureC: 92, assumedFields: ['temperature'], grind: 'medium-coarse (about 850 microns, estimated from a photo)',
+    guideSeconds: 90, guideRangeSeconds: [85, 95], earlyPull: true,
+    pourTargets: [{ seconds: 0, grams: 60 }, { seconds: 35, grams: 120 }, { seconds: 70, grams: 180 }], pourSeconds: 10, restSeconds: 25, pullAfterPourSeconds: 5,
+    geometry: 'three equal center pours, spout held just above the bed, thin slow stream', agitation: 'no stir and no swirl; the dripper is lifted off before it finishes draining', executableCadence: true,
+  },
 ]);
 
 export const V60_TECHNIQUES = Object.freeze({
@@ -68,6 +79,8 @@ export const V60_TECHNIQUES = Object.freeze({
   twoStage: { id: 'rao-two-stage', sourceIds: ['rao-two-stage-v1'], label: 'high-energy two-stage brewing' },
   gentle: { id: 'gentle-main-pour', sourceIds: ['heart-continuous-v1'], label: 'gentle continuous main pour' },
   controlled: { id: 'kurasu-controlled-pulses', sourceIds: ['kurasu-controlled-pulses-v1'], label: 'controlled low-radius pulses' },
+  // Explicit-choice only: the automatic selector never picks it.
+  mameya: { id: 'mameya-three-pour', sourceIds: ['mameya-three-pour-observed-v1'], label: 'three gentle center pours with an early pull' },
 });
 
 export function sourceById(id) { return V60_SOURCES.find((source) => source.id === id) || null; }
@@ -82,6 +95,8 @@ export function validateV60Registry() {
     if (source.supportedV60_02 !== false && source.brewer !== 'V60 02') errors.push(`${source.id}:unsupported-brewer`);
     if (!Number.isFinite(source.doseGrams)) errors.push(`${source.id}:non-finite-dose`);
     if (source.supportedV60_02 !== false && (!Number.isFinite(source.ratio) || !Number.isFinite(source.temperatureC))) errors.push(`${source.id}:non-finite-physical-field`);
+    if (!['primary', 'observed'].includes(source.evidenceType)) errors.push(`${source.id}:unknown-evidence-type`);
+    if (source.evidenceType === 'observed' && !source.observedAt) errors.push(`${source.id}:observed-without-date`);
   }
   for (const technique of Object.values(V60_TECHNIQUES)) {
     if (!technique.sourceIds.every((id) => sourceById(id))) errors.push(`${technique.id}:missing-source`);

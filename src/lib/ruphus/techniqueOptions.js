@@ -62,6 +62,7 @@ const TECHNIQUE_NAMES = Object.freeze({
   'hoffmann-large-batch-v1': 'James Hoffmann Large-Batch V60',
   'kasuya-46-v1': 'Tetsu Kasuya 4:6',
   'heart-continuous-v1': 'Heart Continuous Pour',
+  'mameya-three-pour-observed-v1': 'Koffee Mameya Three-Pour',
 });
 
 // These are deliberately descriptive app-facing differences, assembled only
@@ -83,6 +84,11 @@ const DIFFERENCES = Object.freeze({
   'heart-continuous-v1': [
     'Source recipe: one slow, continuous center pour after a 40–50g bloom.',
     'Vigorous bloom stir and final stir, with a 93–96C source range.',
+  ],
+  'mameya-three-pour-observed-v1': [
+    'Observed at Koffee Mameya, Tokyo (2026-11-27), not a published recipe: three equal center pours 35 seconds apart, 12g to 180g.',
+    'Spout held just above the bed, no stir or swirl, and the dripper is lifted off at about 1:30 before it finishes draining.',
+    'Kettle temperature was not visible, so 92C is an app choice.',
   ],
 });
 

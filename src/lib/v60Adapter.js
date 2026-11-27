@@ -85,7 +85,7 @@ export function selectV60Technique(intent = {}, configuration = {}, evidence = n
 export function v60TechniqueGrindBaselineMicrons(techniqueOrId) {
   const id = typeof techniqueOrId === 'string' ? techniqueOrId : techniqueOrId?.id;
   return id === 'hoffmann-large-batch' ? 760
-    : id === 'kasuya-coarse-pulses' ? 850
+    : id === 'kasuya-coarse-pulses' || id === 'mameya-three-pour' ? 850
       : id === 'rao-two-stage' ? 610
         : id === 'gentle-main-pour' ? 720 : 660;
 }
@@ -142,6 +142,22 @@ function techniqueShape(technique, dose, water, source, intent = {}) {
     [130, round(water * 0.8), `Pour gently to ${round(water * 0.8)}g total over about 10 seconds.`, 'Fourth pour'],
     [160, water, `Pour the final centered pulse to ${water}g total, then let it drain without swirling.`, 'Final pour'],
   ];
+  if (technique.id === 'mameya-three-pour') {
+    // Observed cadence: three equal pours at the same slow flow, a fixed rest
+    // between them, and the dripper lifted off a few seconds after the last
+    // pour. Larger doses keep the flow and rest, so the pours simply last longer.
+    const [first, second, third] = [round(water / 3), round((water * 2) / 3), water];
+    const flowGramsPerSecond = source.pourTargets[0].grams / source.pourSeconds;
+    const pourSeconds = Math.max(source.pourSeconds, round(first / flowGramsPerSecond));
+    const interval = roundToFive(pourSeconds + source.restSeconds);
+    const pullAt = interval * 2 + pourSeconds + source.pullAfterPourSeconds;
+    return [
+      [0, first, `Pour ${first}g in the center over about ${pourSeconds} seconds, spout just above the coffee and a thin, slow stream. Do not stir or swirl.`, 'First pour'],
+      [interval, second, `Pour the same way to ${second}g total over about ${pourSeconds} seconds, center only.`, 'Second pour'],
+      [interval * 2, third, `Pour the last third in the center to ${third}g total over about ${pourSeconds} seconds, then leave it alone.`, 'Third pour'],
+      [pullAt, third, `Finish: lift the dripper off the server by ${timeLabel(pullAt + 5)}, even though coffee is still on the bed. This keeps the thin, bitter last drips out of the cup.`, 'Lift the dripper'],
+    ];
+  }
   if (technique.id === 'rao-two-stage') return [
     [0, source.bloomGrams || bloom, `Bloom with ${source.bloomGrams || bloom}g and immediately spin the brewer firmly to wet the entire bed.`, 'Bloom & spin'],
     [40, round(water * (200 / 330)), `Pour low and steadily in a center-to-outward spiral to ${round(water * (200 / 330))}g, then give one very gentle spin. Wait until the slurry is about 70% drained.`, 'First pour'],
@@ -196,6 +212,7 @@ function reasonForTechnique(technique, config) {
     case 'HIGH_ENERGY_LOW_FINES_PROFILE': return 'This coffee can handle more brewing energy, so two staged pours and controlled spins support an even extraction.';
     case 'CENTER_SPIRAL_PULSE_PROFILE': return 'This coffee suits small, controlled spiral pulses that balance clarity and sweetness.';
     case 'FULLER_CONTROLLED_PULSE_PROFILE': return 'This coffee benefits from controlled pulses that support body while keeping the pour repeatable.';
+    case 'MAMEYA_EARLY_PULL_PROFILE': return 'Koffee Mameya style: three gentle center pours with no stirring, and the dripper comes off early for a clean, light cup.';
     case 'LOW_ENERGY_GENTLE_PROFILE': return 'This coffee suits a calm continuous pour that keeps the slurry stable and extraction even.';
     default: return 'This coffee suits a balanced small-dose pulse pattern for clarity, sweetness, and repeatability.';
   }
@@ -209,6 +226,7 @@ const EXPLICIT_REASON_CODES = Object.freeze({
   'hoffmann-large-batch': 'LARGE_DOSE_DEDICATED_PROFILE',
   'kasuya-coarse-pulses': 'COARSE_PULSE_SOLUBILITY_PROFILE',
   'gentle-main-pour': 'LOW_ENERGY_GENTLE_PROFILE',
+  'mameya-three-pour': 'MAMEYA_EARLY_PULL_PROFILE',
 });
 
 function buildRecipe(intent, config, technique, { fallback = false, preserveIntentOverrides = false } = {}) {
@@ -241,16 +259,23 @@ function buildRecipe(intent, config, technique, { fallback = false, preserveInte
   const adaptedTechnique = technique.id === 'gentle-main-pour' && intent.finesRisk === 'high';
   const sourceCadenceExact = technique.sourceRecipe ? true : source.executableCadence === true;
   const temperatureAdapted = Number.isFinite(source.temperatureC) && temperature !== source.temperatureC;
+  // An observed source can lack a value the app still needs (Mameya's kettle
+  // temperature was not visible). That value is an app rule, never the source's.
+  const temperatureAssumed = (source.assumedFields || []).includes('temperature');
   const ratioAdapted = Number.isFinite(source.ratio) && ratio !== source.ratio;
   const grindOverride = preserveIntentOverrides
     ? (config.grindSize || intentValue(intent, 'grindSize', null) || intentValue(intent, 'reviewedGrindSize', null) || intentValue(intent, 'grindOverride', null))
     : null;
   const grindAdapted = Boolean(grindOverride && typeof grindOverride === 'object');
   const exactSourceProfile = exactSourceDose && sourceCadenceExact && !adaptedTechnique && !temperatureAdapted && !ratioAdapted && !grindAdapted;
+  const cadenceGuide = source.earlyPull === true;
   const sourceGuide = round(source.guideSeconds || 210);
   const doseGuideAdjustment = round((config.dose - (Number(source.doseGrams) || config.dose)) * 2);
   const contactGuideAdjustment = clamp(round(Number(intentValue(intent, 'contactTimeAdjustmentSeconds', 0)) || 0), -15, 15);
-  const guide = exactSourceProfile
+  // Early-pull methods end on the clock at the pull step, not at drawdown.
+  const guide = cadenceGuide
+    ? finalAt + 5
+    : exactSourceProfile
     ? sourceGuide
     : clamp(sourceGuide + doseGuideAdjustment + contactGuideAdjustment, Math.max(120, finalAt + 30), 360);
   const guideAdapted = guide !== sourceGuide;
@@ -259,13 +284,13 @@ function buildRecipe(intent, config, technique, { fallback = false, preserveInte
     ? source.guideRangeSeconds.map((seconds) => seconds + guideRangeShift)
     : [Math.max(guide - 30, finalAt + 30), guide + 30];
   const minimumGuideSpread = exactSourceProfile ? 0 : 20;
-  const guideRange = [
+  const guideRange = cadenceGuide ? [finalAt, finalAt + 10] : [
     Math.max(finalAt + 15, Math.floor(Math.min(rawGuideRange[0], guide - minimumGuideSpread) / 5) * 5),
     Math.ceil(Math.max(rawGuideRange[1], guide + minimumGuideSpread) / 5) * 5,
   ];
   const scalingFields = scaled ? ['dose', 'water', 'bloom', 'cadence', 'guide'] : [];
   const cadenceFields = !sourceCadenceExact ? ['cadence'] : [];
-  const status = !sourceSupportsV60 || adaptedTechnique || ratioAdapted || grindAdapted || (exactSourceDose && (!sourceCadenceExact || temperatureAdapted || guideAdapted))
+  const status = !sourceSupportsV60 || adaptedTechnique || ratioAdapted || grindAdapted || temperatureAssumed || (exactSourceDose && (!sourceCadenceExact || temperatureAdapted || guideAdapted))
     ? 'adapted'
     : exactSourceDose ? 'original' : 'scaled';
   const adaptation = technique.sourceRecipe
@@ -273,14 +298,14 @@ function buildRecipe(intent, config, technique, { fallback = false, preserveInte
     : technique.structuredSource
       ? 'Keeps the roaster’s available guidance inside a complete, tested V60 02 method.'
       : sourceSupportsV60
-        ? `Published method: ${source.author} — ${source.publication}${exactSourceDose ? '' : `, scaled to ${config.dose}g`}${temperatureAdapted ? ' with a bean-specific temperature adjustment' : ''}${ratioAdapted ? ' with the reviewed ratio' : ''}${grindAdapted ? ' with the reviewed grind' : ''}.`
+        ? `${source.evidenceType === 'observed' ? 'Observed method' : 'Published method'}: ${source.author} — ${source.publication}${exactSourceDose ? '' : `, scaled to ${config.dose}g`}${temperatureAdapted ? ' with a bean-specific temperature adjustment' : ''}${ratioAdapted ? ' with the reviewed ratio' : ''}${grindAdapted ? ' with the reviewed grind' : ''}.${temperatureAssumed && !temperatureAdapted ? ` Kettle temperature was not recorded, so the app uses ${temperature}°C.` : ''}`
         : `Adapted from ${source.author}’s V60 01 guide for V60 02 and ${config.dose}g.`;
   const lineage = {
     method: 'v60', mode: 'hot', configurationKey: V60_CONFIGURATION_KEY, technique: technique.id, structuredSource: Boolean(technique.sourceRecipe),
     ...(technique.sourceRecipe ? { canonicalUrls: [technique.sourceRecipe.canonicalUrl] } : {}),
     sourceIds, sourceRegistryVersion: V60_SOURCE_REGISTRY_VERSION, status, adaptation,
-    changedFields: [...scalingFields, ...cadenceFields, !scaled && guideAdapted && 'guide', temperatureAdapted && 'temperature', ratioAdapted && 'ratio', grindAdapted && 'grind', !sourceSupportsV60 && 'brewer', !sourceSupportsV60 && 'dose', !sourceSupportsV60 && 'ratio', !sourceSupportsV60 && 'temperature', (!sourceSupportsV60 || !source.grind) && 'grind', !sourceSupportsV60 && 'geometry', !sourceSupportsV60 && 'cadence', !sourceSupportsV60 && 'agitation', adaptedTechnique && 'agitation'].filter(Boolean),
-    parameterSources: { ratio: ratioAdapted || !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : sourceIds[0], dose: exactSourceDose ? sourceIds[0] : 'user-configuration', temperature: temperatureAdapted || !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : sourceIds[0], grind: grindAdapted || !sourceSupportsV60 || !source.grind ? V60_ADAPTATION_RULE_ID : sourceIds[0], geometry: sourceSupportsV60 ? sourceIds[0] : parameterRule, agitation: adaptedTechnique || !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : sourceIds[0], water: scaled ? V60_SCALING_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule), bloom: !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : scaled || !sourceCadenceExact ? V60_SCALING_RULE_ID : sourceIds[0], cadence: !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : scaled || !sourceCadenceExact ? V60_SCALING_RULE_ID : sourceIds[0], guide: scaled ? V60_SCALING_RULE_ID : guideAdapted ? V60_ADAPTATION_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule) },
+    changedFields: [...scalingFields, ...cadenceFields, !scaled && guideAdapted && 'guide', (temperatureAdapted || temperatureAssumed) && 'temperature', ratioAdapted && 'ratio', grindAdapted && 'grind', !sourceSupportsV60 && 'brewer', !sourceSupportsV60 && 'dose', !sourceSupportsV60 && 'ratio', !sourceSupportsV60 && 'temperature', (!sourceSupportsV60 || !source.grind) && 'grind', !sourceSupportsV60 && 'geometry', !sourceSupportsV60 && 'cadence', !sourceSupportsV60 && 'agitation', adaptedTechnique && 'agitation'].filter(Boolean),
+    parameterSources: { ratio: ratioAdapted || !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : sourceIds[0], dose: exactSourceDose ? sourceIds[0] : 'user-configuration', temperature: temperatureAdapted || temperatureAssumed || !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : sourceIds[0], grind: grindAdapted || !sourceSupportsV60 || !source.grind ? V60_ADAPTATION_RULE_ID : sourceIds[0], geometry: sourceSupportsV60 ? sourceIds[0] : parameterRule, agitation: adaptedTechnique || !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : sourceIds[0], water: scaled ? V60_SCALING_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule), bloom: !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : scaled || !sourceCadenceExact ? V60_SCALING_RULE_ID : sourceIds[0], cadence: !sourceSupportsV60 ? V60_ADAPTATION_RULE_ID : scaled || !sourceCadenceExact ? V60_SCALING_RULE_ID : sourceIds[0], guide: scaled ? V60_SCALING_RULE_ID : guideAdapted ? V60_ADAPTATION_RULE_ID : (sourceSupportsV60 ? sourceIds[0] : parameterRule) },
   };
   return {
     method: 'pour-over', device: 'v60', mode: 'hot', isIced: false, configurationKey: V60_CONFIGURATION_KEY,
@@ -296,7 +321,9 @@ function buildRecipe(intent, config, technique, { fallback = false, preserveInte
     reasonCodes: [...(intent.reasonCodes || []), technique.reasonCode, technique.explicitSelection && 'EXPLICIT_TECHNIQUE_SELECTION', fallback && 'V60_CONSERVATIVE_BASELINE'].filter(Boolean),
     fallback: Boolean(fallback), generationStatus: fallback ? 'fallback' : 'candidate',
     reasoning: reasonForTechnique(technique, config),
-    tips: 'Finish when the steady stream slows to occasional drips. Save the actual drawdown; taste decides what to change next time.',
+    tips: cadenceGuide
+      ? 'Lift the dripper on time even if it is still dripping. If the cup tastes thin or sour, grind a little finer next time instead of letting it drain longer.'
+      : 'Finish when the steady stream slows to occasional drips. Save the actual drawdown; taste decides what to change next time.',
     title: 'V60 02 recipe for this bean',
   };
 }
